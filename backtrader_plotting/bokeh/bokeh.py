@@ -5,13 +5,15 @@ import datetime
 from typing import List
 import pandas
 import backtrader as bt
-from bokeh.models import ColumnDataSource, ToolbarBox
+from ..schemes import PlotMode
+from bokeh.models import ColumnDataSource, ToolbarBox, NumberFormatter
 from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn, DateFormatter, Paragraph
 from bokeh.layouts import column, gridplot, layout, row
 from bokeh.plotting import output_file, show
 from bokeh.layouts import Column
 from .figure import Figure, HoverContainer
-from ..schemes import PlotScheme
+from ..schemes import Blackly
+from ..schemes.scheme import Scheme
 from bokeh.embed import file_html
 from bokeh.resources import CDN
 from bokeh.util.browser import view
@@ -22,7 +24,7 @@ from bokeh.models.widgets import CheckboxButtonGroup
 
 
 class Bokeh(metaclass=bt.MetaParams):
-    params = (('scheme', PlotScheme()),)
+    params = (('scheme', Blackly()),)
 
     def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
@@ -34,6 +36,9 @@ class Bokeh(metaclass=bt.MetaParams):
         self._cds: ColumnDataSource = None
         self._analyzers = None
         self._hoverc = HoverContainer()
+
+        if not isinstance(self.p.scheme, Scheme):
+            raise Exception("Provided scheme has to be a subclass of backtrader_plogging.schemes.scheme.Scheme")
 
         inject_humanreadable()
 
@@ -175,9 +180,9 @@ class Bokeh(metaclass=bt.MetaParams):
         self._hoverc.apply_hovertips(self._figures)
 
     def show(self):
-        if self.p.scheme.plot_mode == PlotScheme.Mode.Single:
+        if self.p.scheme.plot_mode == PlotMode.Single:
             self._show_single()
-        elif self.p.scheme.plot_mode == PlotScheme.Mode.Tabs:
+        elif self.p.scheme.plot_mode == PlotMode.Tabs:
             self._show_tabs()
         else:
             raise Exception("Unsupported plot mode")
@@ -245,8 +250,8 @@ class Bokeh(metaclass=bt.MetaParams):
             cds.add(values, 'features')
 
             columns = [
-                TableColumn(field="labels", title="Performance"),
-                TableColumn(field="features", title="Value"),
+                TableColumn(field="labels", title="Performance"),  # 0.000% for percentage
+                TableColumn(field="features", title="Value", formatter=NumberFormatter(format="0.00")),
             ]
             cur_row.append([title, DataTable(source=cds, columns=columns, width=self.p.scheme.table_width, height=self.p.scheme.table_height, row_headers=False)])
             if len(cur_row) == 2:
@@ -259,8 +264,8 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def _output_plot_file(self, obj, filename="lines.html"):
         env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
-        templ = env.get_template("file_adv.html.j2")
-        templ.globals['now'] = datetime.datetime.utcnow
+        templ = env.get_template("basic.html.j2")
+        templ.globals['now'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         html = file_html(obj,
                          template=templ,
                          resources=CDN,
@@ -268,12 +273,16 @@ class Bokeh(metaclass=bt.MetaParams):
                              datatable_row_color_even=self.p.scheme.table_color_even,
                              datatable_row_color_odd=self.p.scheme.table_color_odd,
                              datatable_header_color=self.p.scheme.table_header_color,
-                             tab_active_background_color=self.p.scheme.border_fill,
-                             tab_active_color=self.p.scheme.plot_title_text_color,
+                             tab_active_background_color=self.p.scheme.tab_active_background_color,
+                             tab_active_color=self.p.scheme.tab_active_color,
 
                              tooltip_background_color=self.p.scheme.tooltip_background_color,
                              tooltip_text_color_label=self.p.scheme.tooltip_text_label_color,
                              tooltip_text_color_value=self.p.scheme.tooltip_text_value_color,
+                             body_background_color=self.p.scheme.body_fill,
+                             headline_color=self.p.scheme.plot_title_text_color,
+                             text_color=self.p.scheme.text_color,
+                             show_headline=self.p.scheme.show_headline,
                          )
                          )
 

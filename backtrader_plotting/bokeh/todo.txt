@@ -1,0 +1,9 @@
+* Multiple Tabs
+* x-axis no gaps
+    * data as lines
+    * above/under
+
+* Linked Crosshair
+* bigger OHLC figures
+* resizable figures
+* permanent tooltip

@@ -1,1 +1,3 @@
-from .schemes import PlotScheme, TradimoScheme
+from .tradimo import Tradimo
+from .blackly import Blackly
+from .scheme import PlotMode

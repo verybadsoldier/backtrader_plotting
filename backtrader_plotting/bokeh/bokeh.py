@@ -12,6 +12,7 @@ from bokeh.layouts import column, gridplot, layout, row
 from bokeh.plotting import output_file, show
 from bokeh.layouts import Column
 from .figure import Figure, HoverContainer
+from .datatable import TableGenerator
 from ..schemes import Blackly
 from ..schemes.scheme import Scheme
 from bokeh.embed import file_html
@@ -36,6 +37,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._cds: ColumnDataSource = None
         self._analyzers = None
         self._hoverc = HoverContainer()
+        self._tablegen = TableGenerator(self.p.scheme)
 
         if not isinstance(self.p.scheme, Scheme):
             raise Exception("Provided scheme has to be a subclass of backtrader_plogging.schemes.scheme.Scheme")
@@ -210,11 +212,11 @@ class Bokeh(metaclass=bt.MetaParams):
         datas = [x for x in figs if issubclass(x.master_type, bt.DataBase)]
         inds = [x for x in figs if issubclass(x.master_type, bt.Indicator)]
 
-        g = gridplot([[x.figure] for x in observers], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
+        g1 = gridplot([[x.figure] for x in observers], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
         g2 = gridplot([[x.figure] for x in datas], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
         g3 = gridplot([[x.figure] for x in inds], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
 
-        tab_observers = Panel(child=g, title="Observers")
+        tab_observers = Panel(child=g1, title="Observers")
         tab_datas = Panel(child=g2, title="Datas")
         tab_indicators = Panel(child=g3, title="Indicators")
         tab_analyzers = self._get_analyzer_tab()
@@ -223,41 +225,22 @@ class Bokeh(metaclass=bt.MetaParams):
         self._output_plot_file(tabs)
 
     def _get_analyzer_tab(self):
-        rows = []
-        cur_row = []
+        def _get_column_row_count(col) -> int:
+            return sum([x.height for x in col if x.height is not None])
+
+        col_childs = [[], []]
         for name, analyzer in self._analyzers.getitems():
-            acls = type(analyzer)
-            hrlables = getattr(acls, 'human_labels', {})
-            cds = ColumnDataSource()
-            labels = []
-            values = []
+            table_header, elements = self._tablegen.get_analyzers_tables(analyzer)
 
-            def add_to_table(item, baselabel=""):
-                for ak, av in item.items():
-                    if ak in hrlables:
-                        ak = hrlables[ak]
-                    label = f"{baselabel} - {ak}" if len(baselabel) > 0 else ak
-                    if isinstance(av, (bt.AutoOrderedDict, OrderedDict)):
-                        add_to_table(av, label)
-                    else:
-                        labels.append(label)
-                        values.append(av)
+            col0cnt = _get_column_row_count(col_childs[0])
+            col1cnt = _get_column_row_count(col_childs[1])
+            col_idx = 0 if col0cnt < col1cnt else 1
+            col_childs[col_idx] += [table_header] + elements
 
-            title = Paragraph(text=name, width=200, style={'font-size': 'large'})
-            add_to_table(analyzer.rets)
-
-            cds.add(labels, 'labels')
-            cds.add(values, 'features')
-
-            columns = [
-                TableColumn(field="labels", title="Performance"),  # 0.000% for percentage
-                TableColumn(field="features", title="Value", formatter=NumberFormatter(format="0.00")),
-            ]
-            cur_row.append([title, DataTable(source=cds, columns=columns, width=self.p.scheme.table_width, height=self.p.scheme.table_height, row_headers=False)])
-            if len(cur_row) == 2:
-                rows.append(cur_row)
-                cur_row = []
-        return Panel(child=layout(rows), title="Analyzers")
+        column1 = column(children=col_childs[0], sizing_mode='fixed')
+        column2 = column(children=col_childs[1], sizing_mode='fixed')
+        base_row = row(children=[column1, column2], sizing_mode='fixed')
+        return Panel(child=base_row, title="Analyzers")
 
     def _output_plot(self, obj):
         show(obj)

@@ -281,7 +281,7 @@ class Figure(object):
                 self._nextcolor(obj.plotinfo.plotmaster)
                 color = self._color(obj.plotinfo.plotmaster)
 
-            self.figure.line('datetime', src_prefix + 'close', source=self._cds, line_color=color, legend=obj._name, output_backend="webgl")
+            self.figure.line('datetime', src_prefix + 'close', source=self._cds, line_color=color, legend=obj._name)
         elif self._scheme.style == 'bar':
             self.figure.segment('datetime', src_prefix + 'high', 'datetime', src_prefix + 'low', source=self._cds, color=src_prefix + 'colors_wicks', legend=obj._name)
             renderer = self.figure.vbar('datetime',

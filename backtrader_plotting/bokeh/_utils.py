@@ -1,5 +1,6 @@
 import backtrader
 from .._convert import nanfilt
+import matplotlib.colors
 
 
 def convert_color(color):
@@ -9,7 +10,7 @@ def convert_color(color):
         hex_string = '#{0:02x}{0:02x}{0:02x}'.format(val)
         return hex_string
     except ValueError:
-        return color
+        return matplotlib.colors.to_hex(color)
 
 
 def sanitize_source_name(name: str) -> str:

@@ -1,15 +1,16 @@
-from typing import List
+from typing import List, Union
 import collections
 
 import pandas
 import backtrader as bt
 
+from backtrader_plotting.utils import get_strategy_count, get_strategy_label
 from ._utils import convert_color, sanitize_source_name, get_bar_length_ms, convert_linestyle, adapt_yranges
 from .._convert import convert_to_pandas, nanfilt
 
 from bokeh.models import Span
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, CrosshairTool
+from bokeh.models import HoverTool, CrosshairTool, ColumnDataSource
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 
@@ -19,7 +20,7 @@ class HoverContainer(object):
     def __init__(self):
         self._hover_tooltips = collections.defaultdict(list)
 
-    def add_hovertip(self, label: str, tmpl:str, hover_target: object=None) -> None:
+    def add_hovertip(self, label: str, tmpl: str, hover_target: object=None, strategy_target=None) -> None:
         """hover_target being None means all"""
         self._hover_tooltips[hover_target].append((label, tmpl))
 
@@ -39,8 +40,9 @@ class HoverContainer(object):
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, cds, hoverc: HoverContainer, start, end, scheme, master_type, plotabove: bool):
-        self._cds = cds
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master_type, plotabove: bool):
+        self._strategy = strategy
+        self._cds: ColumnDataSource = cds
         self._hoverc = hoverc
         self._scheme = scheme
         self._start = start
@@ -73,29 +75,29 @@ class Figure(object):
         return self._coloridx[key]
 
     def _color(self, key: object=None):
-        return self._scheme.color(self._coloridx[key])
+        return convert_color(self._scheme.color(self._coloridx[key]))
 
     def _init_figure(self):
         # plot height will be set later
         f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, logo=None, sizing_mode='scale_width', x_axis_type='datetime', output_backend="webgl")
-        f.border_fill_color = self._scheme.border_fill
+        f.border_fill_color = convert_color(self._scheme.border_fill)
 
-        f.xaxis.axis_line_color = self._scheme.axis_line_color
-        f.yaxis.axis_line_color = self._scheme.axis_line_color
-        f.xaxis.minor_tick_line_color = self._scheme.tick_line_color
-        f.yaxis.minor_tick_line_color = self._scheme.tick_line_color
-        f.xaxis.major_tick_line_color = self._scheme.tick_line_color
-        f.yaxis.major_tick_line_color = self._scheme.tick_line_color
+        f.xaxis.axis_line_color = convert_color(self._scheme.axis_line_color)
+        f.yaxis.axis_line_color = convert_color(self._scheme.axis_line_color)
+        f.xaxis.minor_tick_line_color = convert_color(self._scheme.tick_line_color)
+        f.yaxis.minor_tick_line_color = convert_color(self._scheme.tick_line_color)
+        f.xaxis.major_tick_line_color = convert_color(self._scheme.tick_line_color)
+        f.yaxis.major_tick_line_color = convert_color(self._scheme.tick_line_color)
 
-        f.xaxis.major_label_text_color = self._scheme.axis_label_text_color
-        f.yaxis.major_label_text_color = self._scheme.axis_label_text_color
+        f.xaxis.major_label_text_color = convert_color(self._scheme.axis_label_text_color)
+        f.yaxis.major_label_text_color = convert_color(self._scheme.axis_label_text_color)
 
-        f.xgrid.grid_line_color = self._scheme.grid_line_color
-        f.ygrid.grid_line_color = self._scheme.grid_line_color
-        f.title.text_color = self._scheme.plot_title_text_color
+        f.xgrid.grid_line_color = convert_color(self._scheme.grid_line_color)
+        f.ygrid.grid_line_color = convert_color(self._scheme.grid_line_color)
+        f.title.text_color = convert_color(self._scheme.plot_title_text_color)
 
         f.left[0].formatter.use_scientific = False
-        f.background_fill_color = self._scheme.background_fill
+        f.background_fill_color = convert_color(self._scheme.background_fill)
 
         ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)
         f.tools.append(ch)
@@ -117,22 +119,38 @@ class Figure(object):
             self.plot_indicator(obj, master)
             height_set = self._scheme.plot_height_indicator
         elif isinstance(obj, bt.observers.Observer):
-            self.plot_indicator(obj, master)
+            self.plot_observer(obj, master)
             height_set = self._scheme.plot_height_observer
 
         # set height according to master type
         if master is None:
             self.figure.plot_height = height_set
 
+    @staticmethod
+    def _get_datas_description(ind: bt.Indicator) -> str:
+        """Returns a string listing all involved data feeds. Empty string if there is only a single feed in the mix"""
+        if len(ind._clock._env.datas) == 1:
+            return ""
+        names = [x._dataname for x in ind.datas]
+        return f"({','.join(names)})"
 
-    def plot_indicator(self, obj, master):
-        self._figure_append_title(obj.plotlabel())
+    def plot_observer(self, obj, master):
+        self.plot_indicator(obj, master)
+
+    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
+        pl = obj.plotlabel()
+        if isinstance(obj, bt.Indicator):
+            pl += Figure._get_datas_description(obj)
+        elif isinstance(obj, bt.Observer):
+            pl += get_strategy_label(obj._owner)
+
+        self._figure_append_title(pl)
         indlabel = obj.plotlabel()
         plotinfo = obj.plotinfo
-        data = obj._clock
 
         for lineidx in range(obj.size()):
             line = obj.lines[lineidx]
+            source_id = Figure._source_id(line)
             linealias = obj.lines._getlinealias(lineidx)
 
             lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
@@ -153,12 +171,12 @@ class Figure(object):
                 if not lineplotinfo._get('_samecolor', False):
                     self._nextcolor()
                 color = self._color()
+            color = convert_color(color)
 
             kwglyphs = {'name': linealias }
 
-            source_dataname = sanitize_source_name(indlabel + linealias)
             dataline = line.plotrange(self._start, self._end)
-            self._cds.add(dataline, source_dataname)
+            self._add_to_cds(dataline, source_id)
 
             label = None
             if master is None or lineidx == 0 or plotinfo.plotlinelabels:
@@ -170,7 +188,7 @@ class Figure(object):
             if marker is not None:
                 kwglyphs['size'] = lineplotinfo.markersize * 1.2
                 kwglyphs['color'] = color
-                kwglyphs['y'] = source_dataname
+                kwglyphs['y'] = source_id
 
                 mrk_fncs = {'^': self.figure.triangle,
                             'v': self.figure.inverted_triangle,
@@ -181,14 +199,14 @@ class Figure(object):
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
                 kwglyphs['fill_color'] = color
-                kwglyphs['width'] = get_bar_length_ms(data)
-                kwglyphs['top'] = source_dataname
+                kwglyphs['width'] = get_bar_length_ms(obj._clock)
+                kwglyphs['top'] = source_id
 
                 glyph_fnc = self.figure.vbar
             elif method == "line":
                 kwglyphs['line_width'] = 1
                 kwglyphs['color'] = color
-                kwglyphs['y'] = source_dataname
+                kwglyphs['y'] = source_id
 
                 linestyle = getattr(lineplotinfo, "ls", None)
                 if linestyle is not None:
@@ -206,12 +224,11 @@ class Figure(object):
             else:
                 self._add_hover_renderer(renderer)
 
-            # add hovers
             hover_target = None
             is_obs = isinstance(obj, bt.Observer)
             if is_obs and master is None:
                 hover_target = self.figure
-            self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_dataname}{{0,0.000}}", hover_target)
+            self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_id}{{0,0.000}}", hover_target)
 
             # adapt y-axis if needed
             if master is None or getattr(master.plotinfo, 'plotylimited', False) is False:
@@ -249,10 +266,25 @@ class Figure(object):
             self.figure.title.text += " / "
         self.figure.title.text += title
 
-    def plot_data(self, obj, master):
-        src_prefix = sanitize_source_name(obj._name)
+    def _add_to_cds(self, data, name):
+        if name in self._cds.column_names:
+            return
+        self._cds.add(data, name)
 
-        df = convert_to_pandas(obj, self._start, self._end)
+    @staticmethod
+    def _source_id(source):
+        return str(id(source))
+
+    def plot_data(self, data: bt.feeds.DataBase, master):
+        source_id = Figure._source_id(data)
+        title = sanitize_source_name(data._name)
+        if get_strategy_count(data._env) > 1:
+            title += f" ({get_strategy_label(self._strategy)})"
+
+        # append to title
+        self._figure_append_title(title)
+
+        df = convert_to_pandas(data, self._start, self._end)
 
         # configure colors
         colorup = convert_color(self._scheme.barup)
@@ -263,40 +295,37 @@ class Figure(object):
         colordown_outline = convert_color(self._scheme.bardown_outline)
         is_up = df.close > df.open
 
-        self._cds.add(df.open, src_prefix + 'open')
-        self._cds.add(df.high, src_prefix + 'high')
-        self._cds.add(df.low, src_prefix + 'low')
-        self._cds.add(df.close, src_prefix + 'close')
-        self._cds.add([colorup if x else colordown for x in is_up], src_prefix + 'colors_bars')
-        self._cds.add([colorup_wick if x else colordown_wick for x in is_up], src_prefix + 'colors_wicks')
-        self._cds.add([colorup_outline if x else colordown_outline for x in is_up], src_prefix + 'colors_outline')
-
-        # append to title
-        self._figure_append_title(src_prefix)
+        self._add_to_cds(df.open, source_id + 'open')
+        self._add_to_cds(df.high, source_id + 'high')
+        self._add_to_cds(df.low, source_id + 'low')
+        self._add_to_cds(df.close, source_id + 'close')
+        self._add_to_cds([colorup if x else colordown for x in is_up], source_id + 'colors_bars')
+        self._add_to_cds([colorup_wick if x else colordown_wick for x in is_up], source_id + 'colors_wicks')
+        self._add_to_cds([colorup_outline if x else colordown_outline for x in is_up], source_id + 'colors_outline')
 
         if self._scheme.style == 'line':
-            if obj.plotinfo.plotmaster is None:
-                color = self._scheme.loc
+            if data.plotinfo.plotmaster is None:
+                color = convert_color(self._scheme.loc)
             else:
-                self._nextcolor(obj.plotinfo.plotmaster)
-                color = self._color(obj.plotinfo.plotmaster)
+                self._nextcolor(data.plotinfo.plotmaster)
+                color = convert_color(self._color(data.plotinfo.plotmaster))
 
-            self.figure.line('datetime', src_prefix + 'close', source=self._cds, line_color=color, legend=obj._name)
+            self.figure.line('datetime', source_id + 'close', source=self._cds, line_color=color, legend=data._name)
         elif self._scheme.style == 'bar':
-            self.figure.segment('datetime', src_prefix + 'high', 'datetime', src_prefix + 'low', source=self._cds, color=src_prefix + 'colors_wicks', legend=obj._name)
+            self.figure.segment('datetime', source_id + 'high', 'datetime', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend=data._name)
             renderer = self.figure.vbar('datetime',
-                                      get_bar_length_ms(obj) * 0.7,
-                                      src_prefix + 'open',
-                                      src_prefix + 'close',
+                                      get_bar_length_ms(data) * 0.7,
+                                        source_id + 'open',
+                                        source_id + 'close',
                                       source=self._cds,
-                                      fill_color=src_prefix + 'colors_bars',
-                                      line_color=src_prefix + 'colors_outline')
+                                      fill_color=source_id + 'colors_bars',
+                                      line_color=source_id + 'colors_outline')
             self._set_single_hover_renderer(renderer)
 
-            self._hoverc.add_hovertip("Open", f"@{src_prefix}open{{0,0.000}}")
-            self._hoverc.add_hovertip("High", f"@{src_prefix}high{{0,0.000}}")
-            self._hoverc.add_hovertip("Low", f"@{src_prefix}low{{0,0.000}}")
-            self._hoverc.add_hovertip("Close", f"@{src_prefix}close{{0,0.000}}")
+            self._hoverc.add_hovertip("Open", f"@{source_id}open{{0,0.000}}")
+            self._hoverc.add_hovertip("High", f"@{source_id}high{{0,0.000}}")
+            self._hoverc.add_hovertip("Low", f"@{source_id}low{{0,0.000}}")
+            self._hoverc.add_hovertip("Close", f"@{source_id}close{{0,0.000}}")
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
@@ -304,7 +333,7 @@ class Figure(object):
 
         # check if we have to plot volume overlay
         if self._scheme.volume and self._scheme.voloverlay:
-            self.plot_volume(obj, self._scheme.voltrans, True)
+            self.plot_volume(data, self._scheme.voltrans, True)
 
     def plot_volume(self, obj, alpha, extra_axis=False):
         src_prefix = sanitize_source_name(obj._name)
@@ -314,14 +343,14 @@ class Figure(object):
         if len(nanfilt(df.volume)) == 0:
             return
 
-        colorup = self._scheme.volup
-        colordown = self._scheme.voldown
+        colorup = convert_color(self._scheme.volup)
+        colordown = convert_color(self._scheme.voldown)
 
         is_up = df.close > df.open
         colors = [colorup if x else colordown for x in is_up]
 
-        self._cds.add(df.volume, src_prefix + 'volume')
-        self._cds.add(colors, src_prefix + 'volume_colors')
+        self._add_to_cds(df.volume, src_prefix + 'volume')
+        self._add_to_cds(colors, src_prefix + 'volume_colors')
 
         kwargs = {'fill_alpha': alpha,
                   'line_alpha': alpha,

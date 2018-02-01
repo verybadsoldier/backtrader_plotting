@@ -3,6 +3,7 @@ from collections import OrderedDict
 from bokeh.models import ColumnDataSource, Paragraph, TableColumn, DataTable, DateFormatter, NumberFormatter, StringFormatter, Widget
 from typing import List
 from enum import Enum
+from ..utils import get_strategy_label
 
 
 class ColummDataType(Enum):
@@ -18,7 +19,7 @@ class TableGenerator(object):
         self._scheme = scheme
 
     @staticmethod
-    def _get_analyzer_table_generic(analyzer: bt.analyzers.Analyzer) -> List[List[object]]:
+    def _get_analysis_table_generic(analyzer: bt.analyzers.Analyzer) -> List[List[object]]:
         """Returns two columns labeled 'Performance' and 'Value'"""
         table = [['Performance', ColummDataType.STRING], ['Value', ColummDataType.STRING]]
 
@@ -52,11 +53,15 @@ class TableGenerator(object):
     def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer) -> (Paragraph, List[DataTable]):
         acls = type(analyzer)
 
-        if hasattr(acls, 'get_rets_table'):
-            title, table_columns_list = analyzer.get_rets_table()
+        if hasattr(acls, 'get_analysis_table'):
+            title, table_columns_list = analyzer.get_analysis_table()
         else:
             # Analyzer does not provide a table function. Use our generic one
-            title, table_columns_list = TableGenerator._get_analyzer_table_generic(analyzer)
+            title, table_columns_list = TableGenerator._get_analysis_table_generic(analyzer)
+
+        # if we have multiple strategies in the mix, add the name of the involved one
+        if len(analyzer.strategy.env.strats) > 0:
+            title += f' ({get_strategy_label(analyzer.strategy)})'
 
         elems: List[DataTable] = []
         for table_columns in table_columns_list:
@@ -68,4 +73,4 @@ class TableGenerator(object):
                 columns.append(TableColumn(field=col_name, title=c[0], formatter=TableGenerator._get_formatter(c[1])))
             column_height = len(table_columns[0]) * 25
             elems.append(DataTable(source=cds, columns=columns, width=self._scheme.table_width, height=column_height, row_headers=False))
-        return Paragraph(text=title, width=200, style={'font-size': 'large'}), elems
+        return Paragraph(text=title, width=self._scheme.table_width, style={'font-size': 'large'}), elems

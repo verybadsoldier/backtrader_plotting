@@ -18,11 +18,7 @@ from ..schemes.scheme import Scheme
 from bokeh.embed import file_html
 from bokeh.resources import CDN
 from bokeh.util.browser import view
-from backtrader_plotting.utils import inject_humanreadable
-
-from bokeh.layouts import widgetbox
-from bokeh.models.widgets import CheckboxButtonGroup
-
+from typing import Optional
 
 class Bokeh(metaclass=bt.MetaParams):
     params = (('scheme', Blackly()),)
@@ -31,18 +27,15 @@ class Bokeh(metaclass=bt.MetaParams):
         for pname, pvalue in kwargs.items():
             setattr(self.p.scheme, pname, pvalue)
 
-        self._figures: List = []
+        self._figures: List[Figure] = []
         self._data_graph = None
         self._volume_graphs = None
         self._cds: ColumnDataSource = None
-        self._analyzers = None
-        self._hoverc = HoverContainer()
+        self._analyzers: List[bt.ItemCollection] = []
         self._tablegen = TableGenerator(self.p.scheme)
 
         if not isinstance(self.p.scheme, Scheme):
             raise Exception("Provided scheme has to be a subclass of backtrader_plogging.schemes.scheme.Scheme")
-
-        inject_humanreadable()
 
     def _build_graph(self, datas, inds, obs):
         self._data_graph = {}
@@ -136,13 +129,18 @@ class Bokeh(metaclass=bt.MetaParams):
         if not len(strategy):
             return
 
-        self._analyzers = strategy.analyzers
-        # use datetime line of first data as master datetime. also convert it according to user provided tz
-        self._dtline = pandas.Series([bt.num2date(x, strategy.datas[0]._tz) for x in strategy.datas[0].lines.datetime.plotrange(start, end)], name="DateTime")
+        strat_figures = []
+        # reset hover container to not mix hovers with other strategies
+        hoverc = HoverContainer()
+        self._analyzers.append(strategy.analyzers)
 
         # TODO: using a pandas.DataFrame is desired. On bokeh 0.12.13 this failed cause of this issue:
         # https://github.com/bokeh/bokeh/issues/7400
-        self._cds = ColumnDataSource(data={'datetime': self._dtline})
+
+        if self._cds is None:
+            # use datetime line of first data as master datetime. also convert it according to user provided tz
+            dtline = pandas.Series([bt.num2date(x, strategy.datas[0]._tz) for x in strategy.datas[0].lines.datetime.plotrange(start, end)], name="DateTime")
+            self._cds = ColumnDataSource(data={'datetime': dtline})
 
         self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
 
@@ -150,8 +148,8 @@ class Bokeh(metaclass=bt.MetaParams):
 
         for master, slaves in self._data_graph.items():
             plotabove = getattr(master.plotinfo, 'plotabove', False)
-            bf = Figure(self._cds, self._hoverc, start, end, self.p.scheme, type(master), plotabove)
-            self._figures.append(bf)
+            bf = Figure(strategy, self._cds, hoverc, start, end, self.p.scheme, type(master), plotabove)
+            strat_figures.append(bf)
 
             bf.plot(master, None)
 
@@ -159,27 +157,29 @@ class Bokeh(metaclass=bt.MetaParams):
                 bf.plot(s, master)
 
         for v in self._volume_graphs:
-            bf = Figure(self._cds, self._hoverc, start, end, self.p.scheme)
+            bf = Figure(strategy, self._cds, hoverc, start, end, self.p.scheme)
             bf.plot_volume(v, 1.0, start, end)
 
         # apply legend click policy
-        for f in self._figures:
+        for f in strat_figures:
             f.figure.legend.click_policy = self.p.scheme.legend_click
 
-        for f in self._figures:
+        for f in strat_figures:
             f.figure.legend.background_fill_color = self.p.scheme.legend_background_color
             f.figure.legend.label_text_color = self.p.scheme.legend_text_color
 
         # link axis
-        for i in range(1, len(self._figures)):
-            self._figures[i].figure.x_range = self._figures[0].figure.x_range
+        for i in range(1, len(strat_figures)):
+            strat_figures[i].figure.x_range = strat_figures[0].figure.x_range
 
         # configure xaxis visibility
         if self.p.scheme.xaxis_pos == "bottom":
-            for i, f in enumerate(self._figures):
-                f.figure.xaxis.visible = False if i <= len(self._figures) else True
+            for i, f in enumerate(strat_figures):
+                f.figure.xaxis.visible = False if i <= len(strat_figures) else True
 
-        self._hoverc.apply_hovertips(self._figures)
+        hoverc.apply_hovertips(strat_figures)
+
+        self._figures += strat_figures
 
     def show(self):
         if self.p.scheme.plot_mode == PlotMode.Single:
@@ -203,7 +203,11 @@ class Bokeh(metaclass=bt.MetaParams):
         panel_charts = Panel(child=chart_grid, title="Charts")
         panel_analyzers = self._get_analyzer_tab()
 
-        tabs = Tabs(tabs=[panel_charts, panel_analyzers])
+        panels = [panel_charts]
+        if panel_analyzers is not None:
+            panels.append(panel_analyzers)
+
+        tabs = Tabs(tabs=panels)
         self._output_plot_file(tabs)
 
     def _show_tabs(self):
@@ -212,35 +216,50 @@ class Bokeh(metaclass=bt.MetaParams):
         datas = [x for x in figs if issubclass(x.master_type, bt.DataBase)]
         inds = [x for x in figs if issubclass(x.master_type, bt.Indicator)]
 
-        g1 = gridplot([[x.figure] for x in observers], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
-        g2 = gridplot([[x.figure] for x in datas], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
-        g3 = gridplot([[x.figure] for x in inds], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
+        panels = []
 
-        tab_observers = Panel(child=g1, title="Observers")
-        tab_datas = Panel(child=g2, title="Datas")
-        tab_indicators = Panel(child=g3, title="Indicators")
-        tab_analyzers = self._get_analyzer_tab()
+        def add_panel(obj, title):
+            if len(obj) == 0:
+                return
+            g = gridplot([[x.figure] for x in obj], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
+            panels.append(Panel(title=title, child=g))
 
-        tabs = Tabs(tabs=[tab_observers, tab_datas, tab_indicators, tab_analyzers])
+        add_panel(datas, "Datas")
+        add_panel(inds, "Indicators")
+        add_panel(observers, "Observers")
+
+        p_analyzers = self._get_analyzer_tab()
+        if p_analyzers is not None:
+            panels.append(p_analyzers)
+
+        tabs = Tabs(tabs=panels)
         self._output_plot_file(tabs)
 
-    def _get_analyzer_tab(self):
+    def _get_analyzer_tab(self) -> Optional[Panel]:
         def _get_column_row_count(col) -> int:
             return sum([x.height for x in col if x.height is not None])
 
-        col_childs = [[], []]
-        for name, analyzer in self._analyzers.getitems():
-            table_header, elements = self._tablegen.get_analyzers_tables(analyzer)
+        if len(self._analyzers) == 0:
+            return None
 
-            col0cnt = _get_column_row_count(col_childs[0])
-            col1cnt = _get_column_row_count(col_childs[1])
-            col_idx = 0 if col0cnt < col1cnt else 1
-            col_childs[col_idx] += [table_header] + elements
+        col_childs = [[], []]
+        for a in self._analyzers:
+            for name, analyzer in a.getitems():
+                table_header, elements = self._tablegen.get_analyzers_tables(analyzer)
+
+                col0cnt = _get_column_row_count(col_childs[0])
+                col1cnt = _get_column_row_count(col_childs[1])
+                col_idx = 0 if col0cnt <= col1cnt else 1
+                col_childs[col_idx] += [table_header] + elements
 
         column1 = column(children=col_childs[0], sizing_mode='fixed')
-        column2 = column(children=col_childs[1], sizing_mode='fixed')
-        base_row = row(children=[column1, column2], sizing_mode='fixed')
-        return Panel(child=base_row, title="Analyzers")
+        childs = [column1]
+        if len(col_childs[1]) > 0:
+            column2 = column(children=col_childs[1], sizing_mode='fixed')
+            childs.append(column2)
+        childs = row(children=childs, sizing_mode='fixed')
+
+        return Panel(child=childs, title="Analyzers")
 
     def _output_plot(self, obj):
         show(obj)

@@ -30,6 +30,8 @@ It is recommended to install the package in development mode so there will be on
 from backtrader_plotting import Bokeh
 from backtrader_plotting.schemes import Tradimo, PlotMode
 
+<your backtrader code>
+
 b = Bokeh(style='bar', plot_mode=PlotMode.Single, scheme=Tradimo())
 cerebro.plot(b)
 ```

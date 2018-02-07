@@ -89,13 +89,19 @@ def datatable(self):
         tab_len = [['Trade Length', ColummDataType.STRING], ['Total', ColummDataType.INT], ['Min', ColummDataType.INT], ['Max', ColummDataType.INT], ['Average', ColummDataType.FLOAT]]
         tab_len[0].append('Won')
         tab_len[1].append(a['len']['won']['total'])
-        tab_len[2].append(a['len']['won']['min'])
+        if 'min' in a['len']['won']:
+            tab_len[2].append(a['len']['won']['min'])
+        else:
+            tab_len[2].append(float('nan'))
         tab_len[3].append(a['len']['won']['max'])
         tab_len[4].append(a['len']['won']['average'])
 
         tab_len[0].append('Lost')
         tab_len[1].append(a['len']['lost']['total'])
-        tab_len[2].append(99999999999999999)  # bug missing: a['len']['lost']['min'])
+        if 'min' in a['len']['lost']:
+            tab_len[2].append(a['len']['lost']['min'])
+        else:
+            tab_len[2].append(float('nan'))
         tab_len[3].append(a['len']['lost']['max'])
         tab_len[4].append(a['len']['lost']['average'])
 

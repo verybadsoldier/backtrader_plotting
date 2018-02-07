@@ -1,7 +1,7 @@
 import backtrader as bt
 from collections import OrderedDict
 from bokeh.models import ColumnDataSource, Paragraph, TableColumn, DataTable, DateFormatter, NumberFormatter, StringFormatter, Widget
-from typing import List
+from typing import List, Optional
 from enum import Enum
 from ..utils import get_strategy_label
 
@@ -15,8 +15,9 @@ class ColummDataType(Enum):
 
 
 class TableGenerator(object):
-    def __init__(self, scheme):
+    def __init__(self, scheme, cerebro: bt.Cerebro=None):
         self._scheme = scheme
+        self._cerebtro: bt.Cerebro = cerebro
 
     @staticmethod
     def _get_analysis_table_generic(analyzer: bt.analyzers.Analyzer) -> List[List[object]]:
@@ -32,7 +33,7 @@ class TableGenerator(object):
                     table[0].append(label)
                     table[1].append(av)
 
-        add_to_table(analyzer.rets)
+        add_to_table(analyzer.get_analysis())
         return type(analyzer).__name__, [table]
 
     @staticmethod
@@ -50,18 +51,17 @@ class TableGenerator(object):
         else:
             raise Exception(f"Unsupported ColumnDataType: '{ctype}'")
 
-    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer) -> (Paragraph, List[DataTable]):
-        acls = type(analyzer)
-
-        if hasattr(acls, 'get_analysis_table'):
+    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer, strategy: bt.Strategy,
+                             params: Optional[bt.AutoInfoClass]) -> (Paragraph, List[DataTable]):
+        if hasattr(analyzer, 'get_analysis_table'):
             title, table_columns_list = analyzer.get_analysis_table()
         else:
             # Analyzer does not provide a table function. Use our generic one
             title, table_columns_list = TableGenerator._get_analysis_table_generic(analyzer)
 
         # if we have multiple strategies in the mix, add the name of the involved one
-        if len(analyzer.strategy.env.strats) > 0:
-            title += f' ({get_strategy_label(analyzer.strategy)})'
+        if len(strategy.env.strats) > 0:
+            title += f' ({get_strategy_label(strategy, params)})'
 
         elems: List[DataTable] = []
         for table_columns in table_columns_list:

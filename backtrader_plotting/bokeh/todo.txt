@@ -1,9 +1,6 @@
-* Multiple Tabs
+* data feeds with different length (first feed is master?)
+* opt results
 * x-axis no gaps
-    * data as lines
-    * above/under
 
 * Linked Crosshair
-* bigger OHLC figures
-* resizable figures
 * permanent tooltip

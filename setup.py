@@ -20,7 +20,7 @@ setuptools.setup(
     # What does your project relate to?
     keywords=['trading', 'development', 'plotting'],
 
-    # You can just specify the packages manually here if your project is
-    # simple. Or you can use find_packages().
     packages=setuptools.find_packages(),
+    
+    package_data={'backtrader_plotting.bokeh': ['templates/*.j2']},
 )

@@ -1,14 +1,14 @@
 import backtrader as bt
-from typing import Dict
+from typing import Dict, Optional
 
 
 def get_nondefault_params(obj: bt.LineBuffer) -> Dict[str, object]:
     return {key: obj._get(key) for key in obj._getkeys() if not obj.isdefault(key)}
 
 
-def get_strategy_label(strat: bt.Strategy) -> str:
+def get_strategy_label(strat: bt.Strategy, params: Optional[bt.AutoInfoClass]=None) -> str:
     label = type(strat).__name__
-    user_params = get_nondefault_params(strat.params)
+    user_params = get_nondefault_params(params or strat.params)
     plabs = [f"{x}: {y}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
     return f'{label} [{plabs}]'

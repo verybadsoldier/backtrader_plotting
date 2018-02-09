@@ -3,10 +3,9 @@ import collections
 
 import backtrader as bt
 
-from backtrader_plotting.utils import get_strategy_count, get_strategy_label
+from backtrader_plotting.utils import get_strategy_label
 from ._utils import convert_color, sanitize_source_name, get_bar_length_ms, convert_linestyle, adapt_yranges
-from backtrader_archive.data.convert import convert_to_pandas, nanfilt
-from backtrader_archive.data.archive import DataBase, Indicator, Observer, Analyzer
+from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
 from bokeh.models import Span
 from bokeh.plotting import figure
@@ -112,13 +111,13 @@ class Figure(object):
         self.figure = f
 
     def plot(self, obj, master=None):
-        if isinstance(obj, (bt.feeds.DataBase, DataBase)):
+        if isinstance(obj, bt.feeds.DataBase):
             self.plot_data(obj, master)
             height_set = self._scheme.plot_height_data
-        elif isinstance(obj, (bt.indicator.Indicator, Indicator)):
+        elif isinstance(obj, bt.indicator.Indicator):
             self.plot_indicator(obj, master)
             height_set = self._scheme.plot_height_indicator
-        elif isinstance(obj, (bt.observers.Observer, Observer)):
+        elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj, master)
             height_set = self._scheme.plot_height_observer
 
@@ -142,9 +141,9 @@ class Figure(object):
 
     def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
         pl = obj.plotlabel()
-        if isinstance(obj, (bt.Indicator, Indicator)):
+        if isinstance(obj, bt.Indicator):
             pl += Figure._get_datas_description(obj)
-        elif isinstance(obj, (bt.Observer, Observer)):
+        elif isinstance(obj, bt.Observer):
             pl += get_strategy_label(obj._owner)
 
         self._figure_append_title(pl)
@@ -228,7 +227,7 @@ class Figure(object):
                 self._add_hover_renderer(renderer)
 
             hover_target = None
-            is_obs = isinstance(obj, (bt.Observer, Observer))
+            is_obs = isinstance(obj, bt.Observer)
             if is_obs and master is None:
                 hover_target = self.figure
             self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_id}{{0,0.000}}", hover_target)
@@ -281,7 +280,7 @@ class Figure(object):
     def plot_data(self, data: bt.feeds.DataBase, master):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(data._name)
-        if get_strategy_count(data._env) > 1:
+        if len(data._env.strats) > 1:
             title += f" ({get_strategy_label(self._strategy)})"
 
         # append to title

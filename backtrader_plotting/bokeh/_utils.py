@@ -1,7 +1,6 @@
 import backtrader
-from backtrader_archive.data.convert import nanfilt
 import matplotlib.colors
-
+from backtrader_plotting.utils import nanfilt
 
 def convert_color(color):
     """if color is a float value then it is interpreted as a shade of grey and converted to the corresponding html color code"""

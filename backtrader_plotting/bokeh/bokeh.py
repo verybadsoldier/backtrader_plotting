@@ -1,18 +1,16 @@
 import bisect
 import os
 import tempfile
-from collections import OrderedDict
 from jinja2 import Environment, PackageLoader
 import datetime
 from typing import List
 import pandas
 import backtrader as bt
 from ..schemes import PlotMode
-from bokeh.models import ColumnDataSource, ToolbarBox, NumberFormatter
-from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn, DateFormatter, Paragraph
-from bokeh.layouts import column, gridplot, layout, row
-from bokeh.plotting import output_file, show
-from bokeh.layouts import Column
+from bokeh.models import ColumnDataSource
+from bokeh.models.widgets import Panel, Tabs
+from bokeh.layouts import column, gridplot, row
+from bokeh.plotting import show
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
@@ -21,8 +19,6 @@ from bokeh.embed import file_html
 from bokeh.resources import CDN
 from bokeh.util.browser import view
 from typing import Optional, Union, Tuple
-from backtrader_archive import Strategy as btaStrategy
-from backtrader_archive.data.archive import DataBase, Indicator, Observer, Analyzer
 
 
 class FigurePage(object):
@@ -144,7 +140,7 @@ class Bokeh(metaclass=bt.MetaParams):
             raise Exception("Different backends by 'use' not supported")
 
         # TODO: fix classes
-        if isinstance(obj, (bt.Strategy, btaStrategy)):
+        if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
             if self._cerebro is None:
@@ -256,9 +252,9 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def _show_tabs(self, fp: FigurePage, filename: str=None):
         figs = list(fp.figures)
-        observers = [x for x in figs if issubclass(x.master_type, (bt.Observer, Observer))]
-        datas = [x for x in figs if issubclass(x.master_type, (bt.DataBase, DataBase))]
-        inds = [x for x in figs if issubclass(x.master_type, (bt.Indicator, Indicator))]
+        observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
+        datas = [x for x in figs if issubclass(x.master_type, bt.DataBase)]
+        inds = [x for x in figs if issubclass(x.master_type, bt.Indicator)]
 
         panels = []
 

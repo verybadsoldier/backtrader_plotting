@@ -1,5 +1,8 @@
 import backtrader as bt
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+import math
+from datetime import datetime
+import pandas
 
 
 def get_nondefault_params(obj: bt.LineBuffer) -> Dict[str, object]:
@@ -14,5 +17,20 @@ def get_strategy_label(strat: bt.Strategy, params: Optional[bt.AutoInfoClass]=No
     return f'{label} [{plabs}]'
 
 
-def get_strategy_count(cerebro: bt.Cerebro):
-    return len(cerebro.strats)
+def nanfilt(x: List) -> List:
+    """filters all NaN values from a list"""
+    return [value for value in x if not math.isnan(value)]
+
+
+def convert_to_pandas(obj: bt.LineSeries, start: datetime=None, end: datetime=None, name_prefix: str="") -> pandas.DataFrame:
+    df = pandas.DataFrame()
+    for lineidx in range(obj.size()):
+        line = obj.lines[lineidx]
+        linealias = obj.lines._getlinealias(lineidx)
+        data = line.plotrange(start, end)
+
+        if linealias == 'datetime':
+            data = [bt.num2date(x) for x in data]
+        df[name_prefix + linealias] = data
+    return df
+

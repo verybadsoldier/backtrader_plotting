@@ -22,7 +22,7 @@ Switch to branch `develop`:
 
 It is recommended to install the package in development mode so there will be only a link created in the python directory to your cloned repository. So updating your checkout directory will immediately take effect:
 
-`python setup.py develop`
+`python setup.py install develop`
 
 ## Quickstart
 

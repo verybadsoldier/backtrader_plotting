@@ -36,7 +36,7 @@ b = Bokeh(style='bar', plot_mode=PlotMode.Single, scheme=Tradimo())
 cerebro.plot(b)
 ```
 
-## Mininmal Example
+## Minimal Example
 ```python
 import datetime
 import backtrader as bt

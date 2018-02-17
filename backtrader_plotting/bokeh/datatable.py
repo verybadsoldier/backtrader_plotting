@@ -59,9 +59,7 @@ class TableGenerator(object):
             # Analyzer does not provide a table function. Use our generic one
             title, table_columns_list = TableGenerator._get_analysis_table_generic(analyzer)
 
-        # if we have multiple strategies in the mix, add the name of the involved one
-        if len(strategy.env.strats) > 0:
-            title += f' ({get_strategy_label(strategy, params)})'
+        title += f' ({get_strategy_label(strategy, params)})'
 
         elems: List[DataTable] = []
         for table_columns in table_columns_list:

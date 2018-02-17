@@ -4,14 +4,15 @@ import collections
 import backtrader as bt
 
 from backtrader_plotting.utils import get_strategy_label
-from ._utils import convert_color, sanitize_source_name, get_bar_length_ms, convert_linestyle, adapt_yranges
+from ._utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
 from bokeh.models import Span
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, CrosshairTool, ColumnDataSource
+from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
+from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 
 
 class HoverContainer(object):
@@ -78,7 +79,7 @@ class Figure(object):
 
     def _init_figure(self):
         # plot height will be set later
-        f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, logo=None, sizing_mode='scale_width', x_axis_type='datetime', output_backend="webgl")
+        f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, logo=None, sizing_mode='scale_width', x_axis_type='linear', output_backend="webgl")
         f.border_fill_color = convert_color(self._scheme.border_fill)
 
         f.xaxis.axis_line_color = convert_color(self._scheme.axis_line_color)
@@ -97,6 +98,28 @@ class Figure(object):
 
         f.left[0].formatter.use_scientific = False
         f.background_fill_color = convert_color(self._scheme.background_fill)
+
+		# mechanism for proper date axis without gaps, thanks!
+		# https://groups.google.com/a/continuum.io/forum/#!topic/bokeh/t3HkalO4TGA
+        f.xaxis.formatter = FuncTickFormatter(
+            args=dict(
+                axis=f.xaxis[0],
+                formatter=DatetimeTickFormatter(days=['%d %b', '%a %d'],
+                                                months=['%m/%Y', "%b %y"]),
+                source=self._cds,
+            ),
+            code="""
+                axis.formatter.doFormat = function (ticks) {
+                    const dates = ticks.map(i => source.data.datetime[i]),
+                          valid = t => t !== undefined,
+                          labels = formatter.doFormat(dates.filter(valid));
+                    let i = 0;
+                    return dates.map(t => valid(t) ? labels[i++] : '');
+                };
+                const ticks = axis.tick_coords.major[0],
+                      labels = axis.formatter.doFormat(ticks);
+                return labels[ticks.indexOf(tick)];
+        """)
 
         ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)
         f.tools.append(ch)
@@ -175,7 +198,7 @@ class Figure(object):
                 color = self._color()
             color = convert_color(color)
 
-            kwglyphs = {'name': linealias }
+            kwglyphs = {'name': linealias}
 
             dataline = line.plotrange(self._start, self._end)
             self._add_to_cds(dataline, source_id)
@@ -201,7 +224,7 @@ class Figure(object):
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
                 kwglyphs['fill_color'] = color
-                kwglyphs['width'] = get_bar_length_ms(obj._clock)
+                kwglyphs['width'] = get_bar_width(obj._clock)
                 kwglyphs['top'] = source_id
 
                 glyph_fnc = self.figure.vbar
@@ -218,7 +241,7 @@ class Figure(object):
             else:
                 raise Exception(f"Unknown plotting method '{method}'")
 
-            renderer = glyph_fnc("datetime", source=self._cds, **kwglyphs)
+            renderer = glyph_fnc("index", source=self._cds, **kwglyphs)
 
             # for markers add additional renderer so hover pops up for all of them
             if marker is None:
@@ -230,7 +253,7 @@ class Figure(object):
             is_obs = isinstance(obj, bt.Observer)
             if is_obs and master is None:
                 hover_target = self.figure
-            self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_id}{{0,0.000}}", hover_target)
+            self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_id}{{{self._scheme.number_format}}}", hover_target)
 
             # adapt y-axis if needed
             if master is None or getattr(master.plotinfo, 'plotylimited', False) is False:
@@ -312,22 +335,25 @@ class Figure(object):
                 self._nextcolor(data.plotinfo.plotmaster)
                 color = convert_color(self._color(data.plotinfo.plotmaster))
 
-            self.figure.line('datetime', source_id + 'close', source=self._cds, line_color=color, legend=data._name)
-        elif self._scheme.style == 'bar':
-            self.figure.segment('datetime', source_id + 'high', 'datetime', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend=data._name)
-            renderer = self.figure.vbar('datetime',
-                                      get_bar_length_ms(data) * 0.7,
-                                        source_id + 'open',
-                                        source_id + 'close',
-                                      source=self._cds,
-                                      fill_color=source_id + 'colors_bars',
-                                      line_color=source_id + 'colors_outline')
+            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=data._name)
             self._set_single_hover_renderer(renderer)
 
-            self._hoverc.add_hovertip("Open", f"@{source_id}open{{0,0.000}}")
-            self._hoverc.add_hovertip("High", f"@{source_id}high{{0,0.000}}")
-            self._hoverc.add_hovertip("Low", f"@{source_id}low{{0,0.000}}")
-            self._hoverc.add_hovertip("Close", f"@{source_id}close{{0,0.000}}")
+            self._hoverc.add_hovertip("Close", f"@{source_id}close")
+        elif self._scheme.style == 'bar':
+            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend=data._name)
+            renderer = self.figure.vbar('index',
+                                        get_bar_width(),
+                                        source_id + 'open',
+                                        source_id + 'close',
+                                        source=self._cds,
+                                        fill_color=source_id + 'colors_bars',
+                                        line_color=source_id + 'colors_outline')
+
+            self._set_single_hover_renderer(renderer)
+            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}")
+            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}")
+            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}")
+            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}")
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
@@ -359,7 +385,7 @@ class Figure(object):
                   'name': 'Volume',
                   'legend': 'Volume'}
 
-        ax_formatter = NumeralTickFormatter(format='0.000 a')
+        ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
 
         if extra_axis:
             self.figure.extra_y_ranges = {'axvol': DataRange1d()}
@@ -378,5 +404,5 @@ class Figure(object):
             adapt_yranges(self.figure.y_range, df.volume)
             self.figure.y_range.end /= self._scheme.volscaling
 
-        self.figure.vbar('datetime', get_bar_length_ms(obj) * 0.7, src_prefix + 'volume', 0, source=self._cds, fill_color=src_prefix + 'volume_colors', line_color="black", **kwargs)
-        self._hoverc.add_hovertip("Volume", f"@{src_prefix}volume{{(0.00 a)}}")
+        self.figure.vbar('index', get_bar_width(), src_prefix + 'volume', 0, source=self._cds, fill_color=src_prefix + 'volume_colors', line_color="black", **kwargs)
+        self._hoverc.add_hovertip("Volume", f"@{src_prefix}volume{{({self._scheme.number_format})}}")

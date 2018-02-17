@@ -20,7 +20,11 @@ def sanitize_source_name(name: str) -> str:
     return name
 
 
-def get_bar_length_ms(data) -> float:
+def get_bar_width() -> float:
+    return 0.5
+
+
+def get_bar_width_ms(data) -> float:
     """Calculates the width of one bar depending on current timeframe and compression. In milliseconds"""
     if data._timeframe >= backtrader.TimeFrame.MicroSeconds:
         width_ms = 0.001

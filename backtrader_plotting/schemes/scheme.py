@@ -19,6 +19,7 @@ class Scheme(_BtPlotScheme):
         self.legend_background_color = '#3C3F41'
         self.legend_text_color = 'lightgrey'
 
+        self.loc = 'lightgray'
         self.background_fill = '#222222'
         self.body_fill = "white"
         self.border_fill = "#3C3F41"
@@ -32,9 +33,9 @@ class Scheme(_BtPlotScheme):
 
         self.xaxis_pos = "all"  # "all" or "bottom"
 
-        self.table_color_even = "#404040"
-        self.table_color_odd = "#333333"
-        self.table_header_color = "#7a7a7a"
+        self.table_color_even = '#404040'
+        self.table_color_odd = '#333333'
+        self.table_header_color = '#7a7a7a'
 
         self.plot_width = 1800
         self.table_width = 930
@@ -44,8 +45,8 @@ class Scheme(_BtPlotScheme):
         self.plot_mode = PlotMode.Tabs
 
         self.tooltip_background_color = '#4C4F51'
-        self.tooltip_text_label_color = "#848EFF"
-        self.tooltip_text_value_color = "#aaaaaa"
+        self.tooltip_text_label_color = '#848EFF'
+        self.tooltip_text_value_color = '#aaaaaa'
 
         self.tab_active_background_color = '#333333'
         self.tab_active_color = '#4C4F51'
@@ -53,3 +54,6 @@ class Scheme(_BtPlotScheme):
         self.text_color = 'lightgrey'
 
         self.show_headline = True
+
+        self.number_format = '0,0.000'
+        self.number_format_volume = '0.00 a'

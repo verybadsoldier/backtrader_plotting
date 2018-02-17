@@ -7,7 +7,7 @@ from typing import List
 import pandas
 import backtrader as bt
 from ..schemes import PlotMode
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.layouts import column, gridplot, row
 from bokeh.plotting import show
@@ -94,6 +94,10 @@ class Bokeh(metaclass=bt.MetaParams):
                     self._data_graph[pmaster] = []
                 self._data_graph[pmaster].append(i)
 
+    @property
+    def figures(self):
+        return self._fp.figures
+
     @staticmethod
     def _resolve_plotmaster(obj):
         if obj is None:
@@ -139,7 +143,6 @@ class Bokeh(metaclass=bt.MetaParams):
         if use is not None:
             raise Exception("Different backends by 'use' not supported")
 
-        # TODO: fix classes
         if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
@@ -172,8 +175,11 @@ class Bokeh(metaclass=bt.MetaParams):
 
         if self._fp.cds is None:
             # use datetime line of first data as master datetime. also convert it according to user provided tz
-            dtline = pandas.Series([bt.num2date(x, strategy.datas[0]._tz) for x in strategy.datas[0].lines.datetime.plotrange(start, end)], name="DateTime")
-            self._fp.cds = ColumnDataSource(data={'datetime': dtline})
+            dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in strategy.datas[0].lines.datetime.plotrange(start, end)]
+
+            # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
+            indices = list(range(0, len(dtline)))
+            self._fp.cds = ColumnDataSource(data=dict(datetime=dtline, index=indices))
 
         self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
 
@@ -215,21 +221,22 @@ class Bokeh(metaclass=bt.MetaParams):
         self._fp.figures += strat_figures
 
     def show(self):
-        filename = self._generate_output(self._fp)
+        model = self.generate_model()
+        filename = self._output_plot_file(model)
         view(filename)
 
         self._reset()
         self._num_plots += 1
 
-    def _generate_output(self, fp: FigurePage, filename:str = None) -> str:
+    def generate_model(self) -> Model:
         if self.p.scheme.plot_mode == PlotMode.Single:
-            return self._show_single(fp, filename)
+            return self._model_single(self._fp)
         elif self.p.scheme.plot_mode == PlotMode.Tabs:
-            return self._show_tabs(fp, filename)
+            return self._model_tabs(self._fp)
         else:
             raise Exception("Unsupported plot mode")
 
-    def _show_single(self, fp: FigurePage, filename: str=None):
+    def _model_single(self, fp: FigurePage):
         """Print all figures in one column. Plot observers first, then all plotabove then rest"""
         figs = list(fp.figures)
         observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
@@ -247,10 +254,9 @@ class Bokeh(metaclass=bt.MetaParams):
         if panel_analyzers is not None:
             panels.append(panel_analyzers)
 
-        tabs = Tabs(tabs=panels)
-        return self._output_plot_file(tabs, filename)
+        return Tabs(tabs=panels)
 
-    def _show_tabs(self, fp: FigurePage, filename: str=None):
+    def _model_tabs(self, fp: FigurePage):
         figs = list(fp.figures)
         observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
         datas = [x for x in figs if issubclass(x.master_type, bt.DataBase)]
@@ -272,8 +278,7 @@ class Bokeh(metaclass=bt.MetaParams):
         if p_analyzers is not None:
             panels.append(p_analyzers)
 
-        tabs = Tabs(tabs=panels)
-        return self._output_plot_file(tabs, filename)
+        return Tabs(tabs=panels)
 
     def _get_analyzer_tab(self, fp: FigurePage) -> Optional[Panel]:
         def _get_column_row_count(col) -> int:
@@ -306,7 +311,7 @@ class Bokeh(metaclass=bt.MetaParams):
     def _output_plot(self, obj):
         show(obj)
 
-    def _output_plot_file(self, obj, filename=None, template="basic.html.j2"):
+    def _output_plot_file(self, model, filename=None, template="basic.html.j2"):
         if filename is None:
             tmpdir = tempfile.gettempdir()
             filename = os.path.join(tmpdir, f"bt_bokeh_plot_{self._num_plots}.html")
@@ -314,7 +319,7 @@ class Bokeh(metaclass=bt.MetaParams):
         env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
         templ = env.get_template(template)
         templ.globals['now'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        html = file_html(obj,
+        html = file_html(model,
                          template=templ,
                          resources=CDN,
                          template_variables=dict(

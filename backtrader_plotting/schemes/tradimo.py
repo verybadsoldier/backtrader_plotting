@@ -22,6 +22,7 @@ class Tradimo(Blackly):
         self.legend_text_color = dark_text
         self.legend_click = "hide"  # or "mute"
 
+        self.loc = '#265371'
         self.background_fill = 'white'
         self.body_fill = "white"
         self.border_fill = "white"

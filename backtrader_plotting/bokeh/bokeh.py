@@ -1,5 +1,6 @@
 import bisect
 import os
+import sys
 import tempfile
 from jinja2 import Environment, PackageLoader
 import datetime
@@ -10,7 +11,7 @@ from ..schemes import PlotMode
 from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.layouts import column, gridplot, row
-from bokeh.plotting import show
+from bokeh.plotting import show, output_notebook
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
@@ -143,6 +144,8 @@ class Bokeh(metaclass=bt.MetaParams):
         if use is not None:
             raise Exception("Different backends by 'use' not supported")
 
+        self._iplot = iplot if 'ipykernel' in sys.modules else False
+
         if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
@@ -222,8 +225,11 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def show(self):
         model = self.generate_model()
-        filename = self._output_plot_file(model)
-        view(filename)
+        if self._iplot:
+            self._output_plot(model)
+        else:
+            filename = self._output_plot_file(model)
+            view(filename)
 
         self._reset()
         self._num_plots += 1
@@ -309,6 +315,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._fp = FigurePage()
 
     def _output_plot(self, obj):
+        output_notebook()
         show(obj)
 
     def _output_plot_file(self, model, filename=None, template="basic.html.j2"):

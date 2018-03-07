@@ -11,7 +11,6 @@ from ..schemes import PlotMode
 from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.layouts import column, gridplot, row
-from bokeh.plotting import show, output_notebook
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
@@ -21,6 +20,10 @@ from bokeh.resources import CDN
 from bokeh.util.browser import view
 from typing import Optional, Union, Tuple
 
+if 'ipykernel' in sys.modules:
+    from IPython.core.display import display, HTML
+    from bokeh.io import output_notebook, show
+    output_notebook()
 
 class FigurePage(object):
     def __init__(self):
@@ -42,7 +45,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._num_plots = 0
         self._tablegen = TableGenerator(self.p.scheme)
         if not isinstance(self.p.scheme, Scheme):
-            raise Exception("Provided scheme has to be a subclass of backtrader_plogging.schemes.scheme.Scheme")
+            raise Exception("Provided scheme has to be a subclass of backtrader_plotting.schemes.scheme.Scheme")
 
         self._cerebro: bt.Cerebro = cerebro
         self._fp = FigurePage()
@@ -144,7 +147,7 @@ class Bokeh(metaclass=bt.MetaParams):
         if use is not None:
             raise Exception("Different backends by 'use' not supported")
 
-        self._iplot = iplot if 'ipykernel' in sys.modules else False
+        self._iplot = iplot and 'ipykernel' in sys.modules
 
         if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
@@ -226,7 +229,9 @@ class Bokeh(metaclass=bt.MetaParams):
     def show(self):
         model = self.generate_model()
         if self._iplot:
-            self._output_plot(model)
+            css = self._output_stylesheet()
+            display(HTML(css))
+            show(model)
         else:
             filename = self._output_plot_file(model)
             view(filename)
@@ -314,9 +319,26 @@ class Bokeh(metaclass=bt.MetaParams):
     def _reset(self):
         self._fp = FigurePage()
 
-    def _output_plot(self, obj):
-        output_notebook()
-        show(obj)
+    def _output_stylesheet(self, template="basic.css.j2"):
+        env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
+        templ = env.get_template(template)
+
+        css = templ.render(dict(
+                                 datatable_row_color_even=self.p.scheme.table_color_even,
+                                 datatable_row_color_odd=self.p.scheme.table_color_odd,
+                                 datatable_header_color=self.p.scheme.table_header_color,
+                                 tab_active_background_color=self.p.scheme.tab_active_background_color,
+                                 tab_active_color=self.p.scheme.tab_active_color,
+
+                                 tooltip_background_color=self.p.scheme.tooltip_background_color,
+                                 tooltip_text_color_label=self.p.scheme.tooltip_text_label_color,
+                                 tooltip_text_color_value=self.p.scheme.tooltip_text_value_color,
+                                 body_background_color=self.p.scheme.body_fill,
+                                 headline_color=self.p.scheme.plot_title_text_color,
+                                 text_color=self.p.scheme.text_color,
+                               )
+                          )
+        return css
 
     def _output_plot_file(self, model, filename=None, template="basic.html.j2"):
         if filename is None:
@@ -326,22 +348,12 @@ class Bokeh(metaclass=bt.MetaParams):
         env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
         templ = env.get_template(template)
         templ.globals['now'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         html = file_html(model,
                          template=templ,
                          resources=CDN,
                          template_variables=dict(
-                             datatable_row_color_even=self.p.scheme.table_color_even,
-                             datatable_row_color_odd=self.p.scheme.table_color_odd,
-                             datatable_header_color=self.p.scheme.table_header_color,
-                             tab_active_background_color=self.p.scheme.tab_active_background_color,
-                             tab_active_color=self.p.scheme.tab_active_color,
-
-                             tooltip_background_color=self.p.scheme.tooltip_background_color,
-                             tooltip_text_color_label=self.p.scheme.tooltip_text_label_color,
-                             tooltip_text_color_value=self.p.scheme.tooltip_text_value_color,
-                             body_background_color=self.p.scheme.body_fill,
-                             headline_color=self.p.scheme.plot_title_text_color,
-                             text_color=self.p.scheme.text_color,
+                             stylesheet=self._output_stylesheet(),
                              show_headline=self.p.scheme.show_headline,
                          )
                          )

@@ -78,3 +78,18 @@ if __name__ == '__main__':
     b = Bokeh(style='bar', plot_mode=PlotMode.Single)
     cerebro.plot(b)
 ```
+
+## Plotting Optimization Results
+Another way to use this package is to invoke `Bokeh.plot_result`. This function also supports passing a `cerebro` result object as it is generated in optimization:
+
+```
+    ...
+    cerebro.optstrategy(TestStrategy, buydate=range(1, 10, 1))
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio)
+    ...
+    res = cerebro.run()
+    bo = Bokeh()
+    bo.plot_result(res)
+```
+
+This will start a Bokeh application displaying all optimization results. This feature is experimental and currently expects the analyzer `SharpeRatio` to be available in the mix.

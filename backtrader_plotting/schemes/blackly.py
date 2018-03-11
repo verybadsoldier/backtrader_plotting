@@ -1,4 +1,4 @@
-from .scheme import Scheme, PlotMode
+from .scheme import Scheme
 
 
 class Blackly(Scheme):

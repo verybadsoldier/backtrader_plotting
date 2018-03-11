@@ -11,7 +11,10 @@ def datatable(self):
     tab1 = [['', ColummDataType.STRING], ['Total', ColummDataType.INT], ['Open', ColummDataType.INT], ['Closed', ColummDataType.INT]]
     tab1[0].append('Number of Trades')
     tab1[1].append(a['total']['total'])
-    tab1[2].append(a['total']['open'])
+    if 'open' in a['total']:
+        tab1[2].append(a['total']['open'])
+    else:
+        tab1[2].append('-')
     tab1[3].append(gdef(a['total'], 'closed', 0))
     tables.append(tab1)
 

@@ -5,12 +5,14 @@ import tempfile
 from jinja2 import Environment, PackageLoader
 import datetime
 from typing import List
-import pandas
 import backtrader as bt
-from ..schemes import PlotMode
 from bokeh.models import ColumnDataSource, Model
-from bokeh.models.widgets import Panel, Tabs
+from bokeh.models.widgets import Panel, Tabs, Select, DataTable, TableColumn
 from bokeh.layouts import column, gridplot, row
+from bokeh.server.server import Server
+from bokeh.application import Application
+from bokeh.application.handlers.function import FunctionHandler
+
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
@@ -25,21 +27,24 @@ if 'ipykernel' in sys.modules:
     from bokeh.io import output_notebook, show
     output_notebook()
 
+
 class FigurePage(object):
     def __init__(self):
         self.figures: List[Figure] = []
         self.cds: ColumnDataSource = None
-        self.analyzers: List[Tuple[str, bt.Analyzer, bt.Strategy, Optional[bt.AutoInfoClass]]] = []
+        self.analyzers: List[Tuple[str, bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]]] = []
         self.strategies: List[bt.Strategy] = None
 
 
 class Bokeh(metaclass=bt.MetaParams):
     params = (('scheme', Blackly()),)
 
-    def __init__(self, cerebro: bt.Cerebro=None, **kwargs):
+    def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
             setattr(self.p.scheme, pname, pvalue)
 
+        self._iplot: bool = None
+        self._result: List = None
         self._data_graph = None
         self._volume_graphs = None
         self._num_plots = 0
@@ -47,7 +52,6 @@ class Bokeh(metaclass=bt.MetaParams):
         if not isinstance(self.p.scheme, Scheme):
             raise Exception("Provided scheme has to be a subclass of backtrader_plotting.schemes.scheme.Scheme")
 
-        self._cerebro: bt.Cerebro = cerebro
         self._fp = FigurePage()
 
     def _build_graph(self, datas, inds, obs):
@@ -134,14 +138,23 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return start, end
 
-    def _find_optreturn_idx(self, optreturn: bt.OptReturn) -> Optional[int]:
-        for lst in self._cerebro.runstrats:
-            for idx, o in enumerate(lst):
-                if o == optreturn:
-                    return idx
-        raise Exception("OptReturn object not found in cerebro opt list!")
+    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]]):
+        """Plots a cerebro result. Pass either a list of strategies or a list of list of optreturns"""
+        if not isinstance(result, List):
+            raise Exception("'result' has to be a list")
+        elif len(result) == 0:
+            return
+
+        if isinstance(result[0], List) and len(result[0]) > 0 and isinstance(result[0][0], bt.OptReturn):
+            self.run_optresult(result)
+        elif isinstance(result[0], bt.Strategy):
+            for s in result:
+                self.plot(s)
+            self.show()
 
     def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, **kwargs):
+        """Called by backtrader to plot either a strategy or an optimization results"""
+
         if numfigs > 1:
             raise Exception("numfigs must be 1")
         if use is not None:
@@ -152,15 +165,12 @@ class Bokeh(metaclass=bt.MetaParams):
         if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
-            if self._cerebro is None:
-                raise Exception('No cerebro object provide! Please provide one when plotting OptReturn objects!')
-            # find corresponding strategy in cerebro
-            optidx = self._find_optreturn_idx(obj)
-            strategy = self._cerebro.runningstrats[optidx]
             for name, a in obj.analyzers.getitems():
-                self._fp.analyzers.append((name, a, strategy, obj.params))
+                if not hasattr(obj, 'strategycls'):
+                    raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
+                self._fp.analyzers.append((name, a, obj.strategycls, obj.params))
         else:
-            raise Exception(f'Unsupported plot source object: {type(strategy)}')
+            raise Exception(f'Unsupported plot source object: {type(obj)}')
         return [self._fp]
 
     def _plot_strategy(self, strategy: bt.Strategy, start=None, end=None, **kwargs):
@@ -174,7 +184,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # reset hover container to not mix hovers with other strategies
         hoverc = HoverContainer()
         for name, a in strategy.analyzers.getitems():
-            self._fp.analyzers.append((name, a, strategy, None))
+            self._fp.analyzers.append((name, a, type(strategy), strategy.params))
 
         # TODO: using a pandas.DataFrame is desired. On bokeh 0.12.13 this failed cause of this issue:
         # https://github.com/bokeh/bokeh/issues/7400
@@ -227,6 +237,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._fp.figures += strat_figures
 
     def show(self):
+        """Called by backtrader to display a figure"""
         model = self.generate_model()
         if self._iplot:
             css = self._output_stylesheet()
@@ -240,12 +251,12 @@ class Bokeh(metaclass=bt.MetaParams):
         self._num_plots += 1
 
     def generate_model(self) -> Model:
-        if self.p.scheme.plot_mode == PlotMode.Single:
+        if self.p.scheme.plot_mode == 'single':
             return self._model_single(self._fp)
-        elif self.p.scheme.plot_mode == PlotMode.Tabs:
+        elif self.p.scheme.plot_mode == 'tabs':
             return self._model_tabs(self._fp)
         else:
-            raise Exception("Unsupported plot mode")
+            raise Exception(f"Unsupported plot mode: {self.p.scheme.plot_mode}")
 
     def _model_single(self, fp: FigurePage):
         """Print all figures in one column. Plot observers first, then all plotabove then rest"""
@@ -299,8 +310,8 @@ class Bokeh(metaclass=bt.MetaParams):
             return None
 
         col_childs = [[], []]
-        for name, analyzer, strategy, params in fp.analyzers:
-            table_header, elements = self._tablegen.get_analyzers_tables(analyzer, strategy, params)
+        for name, analyzer, strategycls, params in fp.analyzers:
+            table_header, elements = self._tablegen.get_analyzers_tables(analyzer, strategycls, params)
 
             col0cnt = _get_column_row_count(col_childs[0])
             col1cnt = _get_column_row_count(col_childs[1])
@@ -365,3 +376,64 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def savefig(self, fig, filename, width, height, dpi, tight):
         self._generate_output(fig, filename)
+
+    def generate_model_server(self) -> Model:
+        """Generates an interactive model"""
+        #o = list(self._options.keys())
+        #selector = Select(title="Result:", value="result", options=o)
+
+        cds = ColumnDataSource()
+        ll = [str(x[0]) for x in self._result]
+        cds.add(ll, "name")
+
+        cols = {
+            'sharperatio': lambda strat: strat.analyzers.getbyname('sharperatio').get_analysis()['sharperatio'],
+        }
+
+        columns = [TableColumn(field='name', title='Name')]
+
+        for k, v in cols.items():
+            for o in self._result:
+                ll = str(v(o[0]))
+
+            ll = [str(v(x[0])) for x in self._result]
+            cds.add(ll, k)
+            columns.append(TableColumn(field=k, title=k))
+
+        selector = DataTable(source=cds, columns=columns, width=1600, height=160)
+
+        self.plot(self._result[0][0])
+        model = self.generate_model()
+        r = column([selector, model])
+
+        def update(name, old, new):
+            idx = new['1d']['indices'][0]
+            self._reset()
+            self.plot(self._result[idx][0])
+            r.children[-1] = self.generate_model()
+
+        cds.on_change('selected', update)
+            # selector.on_change('value', update)
+
+        return r
+
+    def run_optresult(self, result: List[List[bt.OptReturn]], iplot=True, notebook_url="localhost:8889"):
+        """Serves a Bokeh application running a web server"""
+        self._result = result
+
+        model = self.generate_model_server()
+
+        def make_document(doc):
+            doc.title = "Hello, world!"
+            doc.add_root(model)
+
+        handler = FunctionHandler(make_document)
+        app = Application(handler)
+        if iplot and 'ipykernel' in sys.modules:
+            show(app, notebook_url=notebook_url)
+        else:
+            apps = {'/': app}
+
+            print("Open your browser here: http://localhost")
+            server = Server(apps, port=80)
+            server.run_until_shutdown()

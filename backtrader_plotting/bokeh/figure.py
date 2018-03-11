@@ -79,7 +79,10 @@ class Figure(object):
 
     def _init_figure(self):
         # plot height will be set later
-        f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, logo=None, sizing_mode='scale_width', x_axis_type='linear', output_backend="webgl")
+        f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, logo=None, sizing_mode='scale_width', x_axis_type='linear')
+        # TODO: backend webgl (output_backend="webgl") removed due to this bug:
+        # https://github.com/bokeh/bokeh/issues/7568
+
         f.border_fill_color = convert_color(self._scheme.border_fill)
 
         f.xaxis.axis_line_color = convert_color(self._scheme.axis_line_color)
@@ -99,8 +102,8 @@ class Figure(object):
         f.left[0].formatter.use_scientific = False
         f.background_fill_color = convert_color(self._scheme.background_fill)
 
-		# mechanism for proper date axis without gaps, thanks!
-		# https://groups.google.com/a/continuum.io/forum/#!topic/bokeh/t3HkalO4TGA
+        # mechanism for proper date axis without gaps, thanks!
+        # https://groups.google.com/a/continuum.io/forum/#!topic/bokeh/t3HkalO4TGA
         f.xaxis.formatter = FuncTickFormatter(
             args=dict(
                 axis=f.xaxis[0],
@@ -154,7 +157,9 @@ class Figure(object):
         names = []
         for x in ind.datas:
             if isinstance(x, bt.DataBase):
-                names.append(x._dataname)
+                # for pandas feed _dataname is a DataFrame
+                # names.append(x._dataname)
+                names.append(x._name)
             elif isinstance(x, bt.Indicator):
                 names.append(x.plotlabel())
         return f"({','.join(names)})"
@@ -167,7 +172,7 @@ class Figure(object):
         if isinstance(obj, bt.Indicator):
             pl += Figure._get_datas_description(obj)
         elif isinstance(obj, bt.Observer):
-            pl += get_strategy_label(obj._owner)
+            pl += get_strategy_label(type(obj._owner), obj._owner.params)
 
         self._figure_append_title(pl)
         indlabel = obj.plotlabel()
@@ -302,7 +307,7 @@ class Figure(object):
 
     def plot_data(self, data: bt.feeds.DataBase, master):
         source_id = Figure._source_id(data)
-        title = sanitize_source_name(data._name)
+        title = sanitize_source_name(data._name or '<NoName>')
         if len(data._env.strats) > 1:
             title += f" ({get_strategy_label(self._strategy)})"
 

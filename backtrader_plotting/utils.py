@@ -5,13 +5,13 @@ from datetime import datetime
 import pandas
 
 
-def get_nondefault_params(obj: bt.LineBuffer) -> Dict[str, object]:
-    return {key: obj._get(key) for key in obj._getkeys() if not obj.isdefault(key)}
+def get_nondefault_params(params: object) -> Dict[str, object]:
+    return {key: params._get(key) for key in params._getkeys() if not params.isdefault(key)}
 
 
-def get_strategy_label(strat: bt.Strategy, params: Optional[bt.AutoInfoClass]=None) -> str:
-    label = type(strat).__name__
-    user_params = get_nondefault_params(params or strat.params)
+def get_strategy_label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoClass]) -> str:
+    label = strategycls.__name__
+    user_params = get_nondefault_params(params)
     plabs = [f"{x}: {y}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
     return f'{label} [{plabs}]'

@@ -51,7 +51,7 @@ class TableGenerator(object):
         else:
             raise Exception(f"Unsupported ColumnDataType: '{ctype}'")
 
-    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer, strategy: bt.Strategy,
+    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer, strategycls: bt.MetaStrategy,
                              params: Optional[bt.AutoInfoClass]) -> (Paragraph, List[DataTable]):
         if hasattr(analyzer, 'get_analysis_table'):
             title, table_columns_list = analyzer.get_analysis_table()
@@ -59,7 +59,7 @@ class TableGenerator(object):
             # Analyzer does not provide a table function. Use our generic one
             title, table_columns_list = TableGenerator._get_analysis_table_generic(analyzer)
 
-        title += f' ({get_strategy_label(strategy, params)})'
+        title += f' ({get_strategy_label(strategycls, params)})'
 
         elems: List[DataTable] = []
         for table_columns in table_columns_list:

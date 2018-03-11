@@ -1,7 +1,4 @@
-from enum import Enum
 from backtrader.plot.scheme import PlotScheme as _BtPlotScheme
-
-PlotMode = Enum('Mode', 'Single Tabs')
 
 
 class Scheme(_BtPlotScheme):
@@ -42,7 +39,7 @@ class Scheme(_BtPlotScheme):
         self.plot_height_data = 800
         self.plot_height_indicator = 400
         self.plot_height_observer = 400
-        self.plot_mode = PlotMode.Tabs
+        self.plot_mode = "tabs"
 
         self.tooltip_background_color = '#4C4F51'
         self.tooltip_text_label_color = '#848EFF'

@@ -36,10 +36,9 @@ class TableGenerator(object):
         add_to_table(analyzer.get_analysis())
         return type(analyzer).__name__, [table]
 
-    @staticmethod
-    def _get_formatter(ctype: ColummDataType):
+    def _get_formatter(self,ctype: ColummDataType):
         if ctype == ColummDataType.FLOAT:
-            return NumberFormatter(format="0.000")
+            return NumberFormatter(format=self._scheme.number_format)
         elif ctype == ColummDataType.INT:
             return NumberFormatter()
         elif ctype == ColummDataType.DATETIME:
@@ -68,7 +67,7 @@ class TableGenerator(object):
             for i, c in enumerate(table_columns):
                 col_name = f'col{i}'
                 cds.add(c[2:], col_name)
-                columns.append(TableColumn(field=col_name, title=c[0], formatter=TableGenerator._get_formatter(c[1])))
+                columns.append(TableColumn(field=col_name, title=c[0], formatter=self._get_formatter(c[1])))
             column_height = len(table_columns[0]) * 25
             elems.append(DataTable(source=cds, columns=columns, width=self._scheme.table_width, height=column_height, row_headers=False))
         return Paragraph(text=title, width=self._scheme.table_width, style={'font-size': 'large'}), elems

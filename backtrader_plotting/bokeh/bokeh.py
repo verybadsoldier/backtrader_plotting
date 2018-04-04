@@ -4,7 +4,7 @@ import sys
 import tempfile
 from jinja2 import Environment, PackageLoader
 import datetime
-from typing import List
+from typing import List, Dict, Callable
 import backtrader as bt
 from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs, Select, DataTable, TableColumn
@@ -21,6 +21,11 @@ from bokeh.embed import file_html
 from bokeh.resources import CDN
 from bokeh.util.browser import view
 from typing import Optional, Union, Tuple
+import logging
+from array import array
+
+_logger = logging.getLogger(__name__)
+
 
 if 'ipykernel' in sys.modules:
     from IPython.core.display import display, HTML
@@ -138,19 +143,21 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return start, end
 
-    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]]):
+    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None):
         """Plots a cerebro result. Pass either a list of strategies or a list of list of optreturns"""
         if not isinstance(result, List):
             raise Exception("'result' has to be a list")
         elif len(result) == 0:
             return
 
-        if isinstance(result[0], List) and len(result[0]) > 0 and isinstance(result[0][0], bt.OptReturn):
-            self.run_optresult(result)
+        if isinstance(result[0], List) and len(result[0]) > 0 and isinstance(result[0][0], (bt.OptReturn, bt.Strategy)):
+            self.run_optresult(result, columns)
         elif isinstance(result[0], bt.Strategy):
             for s in result:
                 self.plot(s)
             self.show()
+        else:
+            raise Exception(f"Unsupported result type: {str(result)}")
 
     def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, **kwargs):
         """Called by backtrader to plot either a strategy or an optimization results"""
@@ -186,12 +193,28 @@ class Bokeh(metaclass=bt.MetaParams):
         for name, a in strategy.analyzers.getitems():
             self._fp.analyzers.append((name, a, type(strategy), strategy.params))
 
+        st_dtime = strategy.lines.datetime.plot()
+        if start is None:
+            start = 0
+        if end is None:
+            end = len(st_dtime)
+
+        if isinstance(start, datetime.date):
+            start = bisect.bisect_left(st_dtime, bt.date2num(start))
+
+        if isinstance(end, datetime.date):
+            end = bisect.bisect_right(st_dtime, bt.date2num(end))
+
+        if end < 0:
+            end = len(st_dtime) + 1 + end  # -1 =  len() -2 = len() - 1
+
         # TODO: using a pandas.DataFrame is desired. On bokeh 0.12.13 this failed cause of this issue:
         # https://github.com/bokeh/bokeh/issues/7400
+        strat_clk: array[float] = strategy.lines.datetime.plotrange(start, end)
 
         if self._fp.cds is None:
-            # use datetime line of first data as master datetime. also convert it according to user provided tz
-            dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in strategy.datas[0].lines.datetime.plotrange(start, end)]
+            # we use timezone of first data
+            dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in strat_clk]
 
             # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
             indices = list(range(0, len(dtline)))
@@ -206,14 +229,14 @@ class Bokeh(metaclass=bt.MetaParams):
             bf = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme, type(master), plotabove)
             strat_figures.append(bf)
 
-            bf.plot(master, None)
+            bf.plot(master, strat_clk, None)
 
             for s in slaves:
-                bf.plot(s, master)
+                bf.plot(s, strat_clk, master)
 
         for v in self._volume_graphs:
             bf = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme)
-            bf.plot_volume(v, 1.0, start, end)
+            bf.plot_volume(v, strat_clk, 1.0, start, end)
 
         # apply legend click policy
         for f in strat_figures:
@@ -377,39 +400,48 @@ class Bokeh(metaclass=bt.MetaParams):
     def savefig(self, fig, filename, width, height, dpi, tight):
         self._generate_output(fig, filename)
 
-    def generate_model_server(self) -> Model:
+    def generate_model_server(self, columns=None) -> Model:
         """Generates an interactive model"""
         #o = list(self._options.keys())
         #selector = Select(title="Result:", value="result", options=o)
 
         cds = ColumnDataSource()
-        ll = [str(x[0]) for x in self._result]
-        cds.add(ll, "name")
+        tab_columns = []
 
-        cols = {
-            'sharperatio': lambda strat: strat.analyzers.getbyname('sharperatio').get_analysis()['sharperatio'],
-        }
+        for idx, strat in enumerate(self._result[0]):
+            # add suffix when dealing with more than 1 strategy
+            strat_suffix = ''
+            if len(self._result[0]):
+                strat_suffix = f' [{idx}]'
 
-        columns = [TableColumn(field='name', title='Name')]
+            for name, val in strat.params._getitems():
+                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}'))
 
-        for k, v in cols.items():
-            for o in self._result:
-                ll = str(v(o[0]))
+                # get value for the current param for all results
+                pvals = []
+                for res in self._result:
+                    pvals.append(res[idx].params._get(name))
+                cds.add(pvals, f"{idx}_{name}")
 
-            ll = [str(v(x[0])) for x in self._result]
-            cds.add(ll, k)
-            columns.append(TableColumn(field=k, title=k))
+        # add user columns specified by parameter 'columns'
+        if columns is not None:
+            for k, v in columns.items():
+                ll = [str(v(x)) for x in self._result]
+                cds.add(ll, k)
+                tab_columns.append(TableColumn(field=k, title=k))
 
-        selector = DataTable(source=cds, columns=columns, width=1600, height=160)
+        selector = DataTable(source=cds, columns=tab_columns, width=1600, height=160)
 
-        self.plot(self._result[0][0])
+        for strat in self._result[idx]:
+            self.plot(strat)
         model = self.generate_model()
         r = column([selector, model])
 
         def update(name, old, new):
             idx = new['1d']['indices'][0]
             self._reset()
-            self.plot(self._result[idx][0])
+            for strat in self._result[idx]:
+                self.plot(strat)
             r.children[-1] = self.generate_model()
 
         cds.on_change('selected', update)
@@ -417,11 +449,17 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return r
 
-    def run_optresult(self, result: List[List[bt.OptReturn]], iplot=True, notebook_url="localhost:8889"):
+    def run_optresult(self, result: List[List[bt.OptReturn]], columns: Dict[str, Callable]=None, iplot=True, notebook_url="localhost:8889"):
         """Serves a Bokeh application running a web server"""
+        if len(result) == 0:
+            return
+
+        if not isinstance(result[0], List):
+            raise Exception("Passes 'result' object is no optimization result!")
+
         self._result = result
 
-        model = self.generate_model_server()
+        model = self.generate_model_server(columns)
 
         def make_document(doc):
             doc.title = "Hello, world!"

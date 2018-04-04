@@ -1,5 +1,6 @@
 from typing import List, Union
 import collections
+from array import array
 
 import backtrader as bt
 
@@ -13,7 +14,7 @@ from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
-
+from backtrader_plotting.utils import resample_line
 
 class HoverContainer(object):
     """Class to store information about hover tooltips. Will be filled while Bokeh glyphs are created. After all figures are complete, hovers will be applied"""
@@ -136,12 +137,12 @@ class Figure(object):
         self._hover = h
         self.figure = f
 
-    def plot(self, obj, master=None):
+    def plot(self, obj, strat_clk, master=None):
         if isinstance(obj, bt.feeds.DataBase):
-            self.plot_data(obj, master)
+            self.plot_data(obj, master, strat_clk)
             height_set = self._scheme.plot_height_data
         elif isinstance(obj, bt.indicator.Indicator):
-            self.plot_indicator(obj, master)
+            self.plot_indicator(obj, master, strat_clk)
             height_set = self._scheme.plot_height_indicator
         elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj, master)
@@ -167,7 +168,7 @@ class Figure(object):
     def plot_observer(self, obj, master):
         self.plot_indicator(obj, master)
 
-    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
+    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array=None):
         pl = obj.plotlabel()
         if isinstance(obj, bt.Indicator):
             pl += Figure._get_datas_description(obj)
@@ -206,6 +207,8 @@ class Figure(object):
             kwglyphs = {'name': linealias}
 
             dataline = line.plotrange(self._start, self._end)
+            line_clk = obj._clock.lines.datetime.plotrange(self._start, self._end)
+            dataline = resample_line(dataline, line_clk, strat_clk)
             self._add_to_cds(dataline, source_id)
 
             label = None
@@ -305,16 +308,16 @@ class Figure(object):
     def _source_id(source):
         return str(id(source))
 
-    def plot_data(self, data: bt.feeds.DataBase, master):
+    def plot_data(self, data: bt.feeds.DataBase, master, strat_clk: array=None):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(data._name or '<NoName>')
         if len(data._env.strats) > 1:
-            title += f" ({get_strategy_label(self._strategy)})"
+            title += f" ({get_strategy_label(type(self._strategy), self._strategy.params)})"
 
         # append to title
         self._figure_append_title(title)
 
-        df = convert_to_pandas(data, self._start, self._end)
+        df = convert_to_pandas(strat_clk, data, self._start, self._end)
 
         # configure colors
         colorup = convert_color(self._scheme.barup)
@@ -366,12 +369,12 @@ class Figure(object):
 
         # check if we have to plot volume overlay
         if self._scheme.volume and self._scheme.voloverlay:
-            self.plot_volume(data, self._scheme.voltrans, True)
+            self.plot_volume(data, strat_clk, self._scheme.voltrans, True)
 
-    def plot_volume(self, obj, alpha, extra_axis=False):
+    def plot_volume(self, obj, strat_clk: array, alpha, extra_axis=False):
         src_prefix = sanitize_source_name(obj._name)
 
-        df = convert_to_pandas(obj, self._start, self._end)
+        df = convert_to_pandas(strat_clk, obj, self._start, self._end)
 
         if len(nanfilt(df.volume)) == 0:
             return

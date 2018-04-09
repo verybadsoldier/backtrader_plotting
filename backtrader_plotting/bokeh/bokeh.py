@@ -42,7 +42,8 @@ class FigurePage(object):
 
 
 class Bokeh(metaclass=bt.MetaParams):
-    params = (('scheme', Blackly()),)
+    params = (('scheme', Blackly()),
+              ('filename', None))
 
     def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
@@ -267,7 +268,7 @@ class Bokeh(metaclass=bt.MetaParams):
             display(HTML(css))
             show(model)
         else:
-            filename = self._output_plot_file(model)
+            filename = self._output_plot_file(model, self.p.filename)
             view(filename)
 
         self._reset()

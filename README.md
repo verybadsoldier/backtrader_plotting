@@ -12,7 +12,7 @@ Find online demos here:
 https://github.com/verybadsoldier/backtrader_plotting/tree/develop/demos
 
 ### Optimization Demo ###
-There also is a demo that shows the visualization of backtrader's optimization results. Since it requires an intergrated webserver hosting for interaction it is not available only.
+There also is a demo that shows the visualization of backtrader's optimization result. Since it requires an intergrated webserver hosting for interaction it is not available online but you need to run it locally.
 
 Run this script to test it:
 `https://github.com/verybadsoldier/backtrader_plotting/blob/develop/demos/optimization.py`

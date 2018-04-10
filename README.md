@@ -92,4 +92,9 @@ Another way to use this package is to invoke `Bokeh.plot_result`. This function 
     bo.plot_result(res)
 ```
 
-This will start a Bokeh application displaying all optimization results. This feature is experimental and currently expects the analyzer `SharpeRatio` to be available in the mix.
+This will start a Bokeh application (standalone webserver) displaying all optimization results.
+
+*NOTE:* When using this feature with `optreturn=True` then your package of `backtrader` has to contain this change of mine:
+```
+https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb
+```

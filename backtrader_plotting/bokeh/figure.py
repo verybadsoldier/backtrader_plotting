@@ -120,9 +120,9 @@ class Figure(object):
                     let i = 0;
                     return dates.map(t => valid(t) ? labels[i++] : '');
                 };
-                const ticks = axis.tick_coords.major[0],
+                const axisticks = axis.tick_coords.major[0],
                       labels = axis.formatter.doFormat(ticks);
-                return labels[ticks.indexOf(tick)];
+                return labels[axisticks.indexOf(tick)];
         """)
 
         ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)

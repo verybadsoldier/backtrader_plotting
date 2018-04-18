@@ -8,15 +8,30 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+
 def get_nondefault_params(params: object) -> Dict[str, object]:
     return {key: params._get(key) for key in params._getkeys() if not params.isdefault(key)}
 
 
+def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
+    user_params = get_nondefault_params(params)
+
+    def get_value_str(name, value):
+        if name == "timeframe":
+            return bt.TimeFrame.getname(value, 1)
+        elif isinstance(value, int):
+            return str(value)
+        else:
+            return "{value:.2f}"
+
+    plabs = [f"{x}: {get_value_str(x, y)}" for x, y in user_params.items()]
+    plabs = '/'.join(plabs)
+    return plabs
+
+
 def get_strategy_label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoClass]) -> str:
     label = strategycls.__name__
-    user_params = get_nondefault_params(params)
-    plabs = [f"{x}: {y:.2f}" for x, y in user_params.items()]
-    plabs = '/'.join(plabs)
+    plabs = get_params_str(params)
     return f'{label} [{plabs}]'
 
 

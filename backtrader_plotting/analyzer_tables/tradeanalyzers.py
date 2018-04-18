@@ -31,11 +31,11 @@ def datatable(self):
         tables.append(tab2)
 
         tab3 = [['Profit & Loss', ColummDataType.STRING], ['Total', ColummDataType.FLOAT], ['Average', ColummDataType.FLOAT]]
-        tab3[0].append('Gross')
+        tab3[0].append('Gross Profit')
         tab3[1].append(a['pnl']['gross']['total'])
         tab3[2].append(a['pnl']['gross']['average'])
 
-        tab3[0].append('Net')
+        tab3[0].append('Net Profit (w/ Commissions)')
         tab3[1].append(a['pnl']['net']['total'])
         tab3[2].append(a['pnl']['net']['average'])
 

@@ -37,7 +37,7 @@ class FigurePage(object):
     def __init__(self):
         self.figures: List[Figure] = []
         self.cds: ColumnDataSource = None
-        self.analyzers: List[Tuple[str, bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]]] = []
+        self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.strategies: List[bt.Strategy] = None
 
 
@@ -173,10 +173,9 @@ class Bokeh(metaclass=bt.MetaParams):
         if isinstance(obj, bt.Strategy):
             self._plot_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
-            for name, a in obj.analyzers.getitems():
-                if not hasattr(obj, 'strategycls'):
-                    raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
-                self._fp.analyzers.append((name, a, obj.strategycls, obj.params))
+            if not hasattr(obj, 'strategycls'):
+                raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
+            self._fp.analyzers = [a for _, a in obj.analyzers.getitems()]
         else:
             raise Exception(f'Unsupported plot source object: {type(obj)}')
         return [self._fp]
@@ -191,8 +190,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         # reset hover container to not mix hovers with other strategies
         hoverc = HoverContainer()
-        for name, a in strategy.analyzers.getitems():
-            self._fp.analyzers.append((name, a, type(strategy), strategy.params))
+        self._fp.analyzers = [a for _, a in strategy.analyzers.getitems()]
 
         st_dtime = strategy.lines.datetime.plot()
         if start is None:
@@ -334,8 +332,8 @@ class Bokeh(metaclass=bt.MetaParams):
             return None
 
         col_childs = [[], []]
-        for name, analyzer, strategycls, params in fp.analyzers:
-            table_header, elements = self._tablegen.get_analyzers_tables(analyzer, strategycls, params)
+        for a in fp.analyzers:
+            table_header, elements = self._tablegen.get_analyzers_tables(a)
 
             col0cnt = _get_column_row_count(col_childs[0])
             col1cnt = _get_column_row_count(col_childs[1])
@@ -460,10 +458,10 @@ class Bokeh(metaclass=bt.MetaParams):
 
         self._result = result
 
-        model = self.generate_model_server(columns)
-
         def make_document(doc):
-            doc.title = "Hello, world!"
+            doc.title = "Backtrader Optimization Result"
+
+            model = self.generate_model_server(columns)
             doc.add_root(model)
 
         handler = FunctionHandler(make_document)

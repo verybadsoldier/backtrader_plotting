@@ -70,7 +70,7 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime=None, end: 
         data = line.plotrange(start, end)
 
         ndata = resample_line(data, obj.lines.datetime.plotrange(start, end), strat_clk)
-        logging.info(f"Filled_line: {linealias}: {str(ndata)}")
+        logging.debug(f"Filled_line: {linealias}: {str(ndata)}")
 
         df[name_prefix + linealias] = ndata
 

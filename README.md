@@ -28,11 +28,11 @@ It is recommended to install the package in development mode so there will be on
 
 ```python
 from backtrader_plotting import Bokeh
-from backtrader_plotting.schemes import Tradimo, PlotMode
+from backtrader_plotting.schemes import Tradimo
 
 <your backtrader code>
 
-b = Bokeh(style='bar', plot_mode=PlotMode.Single, scheme=Tradimo())
+b = Bokeh(style='bar', plot_mode='single', scheme=Tradimo())
 cerebro.plot(b)
 ```
 
@@ -41,7 +41,6 @@ cerebro.plot(b)
 import datetime
 import backtrader as bt
 from backtrader_plotting import Bokeh
-from backtrader_plotting.schemes import PlotMode
 
 
 class TestStrategy(bt.Strategy):
@@ -64,7 +63,7 @@ if __name__ == '__main__':
     cerebro.addstrategy(TestStrategy, buydate=3)
 
     data = bt.feeds.YahooFinanceCSVData(
-        dataname="data/orcl-1995-2014.txt",
+        dataname="datas/orcl-1995-2014.txt",
         # Do not pass values before this date
         fromdate=datetime.datetime(2000, 1, 1),
         # Do not pass values after this date
@@ -75,7 +74,7 @@ if __name__ == '__main__':
 
     cerebro.run()
 
-    b = Bokeh(style='bar', plot_mode=PlotMode.Single)
+    b = Bokeh(style='bar', plot_mode='single')
     cerebro.plot(b)
 ```
 

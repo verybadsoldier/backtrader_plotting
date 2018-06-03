@@ -1,5 +1,5 @@
 import backtrader as bt
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Union
 import math
 from datetime import datetime
 import pandas
@@ -22,7 +22,7 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
         elif isinstance(value, int):
             return str(value)
         else:
-            return "{value:.2f}"
+            return f"{value:.2f}"
 
     plabs = [f"{x}: {get_value_str(x, y)}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
@@ -77,3 +77,13 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime=None, end: 
     df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
     return df
 
+
+def get_data_obj(ind: Union[bt.Indicator, bt.LineSeriesStub]):
+    """obj can be a data object or just a single line (in case indicator was created with an explicit line)"""
+    while True:
+        if isinstance(ind, bt.LineSeriesStub):
+            return ind.owner
+        elif isinstance(ind, bt.Indicator):
+            ind = ind.data
+        else:
+            return ind

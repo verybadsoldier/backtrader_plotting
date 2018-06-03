@@ -4,7 +4,7 @@ from array import array
 
 import backtrader as bt
 
-from backtrader_plotting.utils import get_strategy_label
+from backtrader_plotting.utils import get_strategy_label, get_data_obj
 from ._utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
@@ -16,26 +16,37 @@ from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 from backtrader_plotting.utils import resample_line
 
+
 class HoverContainer(object):
     """Class to store information about hover tooltips. Will be filled while Bokeh glyphs are created. After all figures are complete, hovers will be applied"""
     def __init__(self):
         self._hover_tooltips = collections.defaultdict(list)
+        self._hover_tooltips_data = collections.defaultdict(list)
 
-    def add_hovertip(self, label: str, tmpl: str, hover_target: object=None, strategy_target=None) -> None:
+    def add_hovertip(self, label: str, tmpl: str, target_figure=None) -> None:
         """hover_target being None means all"""
-        self._hover_tooltips[hover_target].append((label, tmpl))
+        self._hover_tooltips[target_figure].append((label, tmpl))
 
-    def apply_hovertips(self, figures: List) -> None:
+    def add_hovertip_for_data(self, label: str, tmpl: str, target_data) -> None:
+        """adds a hovertip for a target data"""
+        self._hover_tooltips_data[target_data].append((label, tmpl))
+
+    def apply_hovertips(self, figures) -> None:
         """Add hovers to to all figures from the figures list"""
         for f in figures:
             for t in f.figure.tools:
                 if not isinstance(t, HoverTool):
                     continue
-                if f.figure in self._hover_tooltips:
-                    hv = self._hover_tooltips[f.figure]
-                else:
-                    hv = self._hover_tooltips[None]
+
+                hv = self._hover_tooltips[None]
                 t.tooltips += hv
+
+                if f.figure in self._hover_tooltips:
+                    t.tooltips += self._hover_tooltips[f.figure]
+
+                for d in f.datas:
+                    if d in self._hover_tooltips_data:
+                        t.tooltips += self._hover_tooltips_data[d]
 
 
 class Figure(object):
@@ -54,6 +65,7 @@ class Figure(object):
         self._hover_line_set = False
         self.master_type = master_type
         self.plotabove = plotabove
+        self.datas = []  # list of all datas that have been plotted to this figure
         self._init_figure()
 
     def _set_single_hover_renderer(self, ren: Renderer):
@@ -147,6 +159,10 @@ class Figure(object):
         elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj, master)
             height_set = self._scheme.plot_height_observer
+        else:
+            raise Exception(f"Unsupported plot object: {type(obj)}")
+
+        self.datas.append(obj)
 
         # set height according to master type
         if master is None:
@@ -207,7 +223,7 @@ class Figure(object):
             kwglyphs = {'name': linealias}
 
             dataline = line.plotrange(self._start, self._end)
-            line_clk = obj._clock.lines.datetime.plotrange(self._start, self._end)
+            line_clk = get_data_obj(obj._clock).lines.datetime.plotrange(self._start, self._end)
             dataline = resample_line(dataline, line_clk, strat_clk)
             self._add_to_cds(dataline, source_id)
 
@@ -226,7 +242,26 @@ class Figure(object):
                 mrk_fncs = {'^': self.figure.triangle,
                             'v': self.figure.inverted_triangle,
                             'o': self.figure.circle,
+
+                            '<': self.figure.circle_cross,
+                            '>': self.figure.circle_x,
+                            '1': self.figure.diamond,
+                            '2': self.figure.diamond_cross,
+                            '3': self.figure.hex,
+                            '4': self.figure.square,
+                            '8': self.figure.square_cross,
+                            's': self.figure.square_x,
+                            'p': self.figure.triangle,
+                            '*': self.figure.asterisk,
+                            'h': self.figure.hex,
+                            'H': self.figure.hex,
+                            '+': self.figure.asterisk,
+                            'x': self.figure.x,
+                            'D': self.figure.diamond_cross,
+                            'd': self.figure.diamond,
                             }
+                if marker not in mrk_fncs:
+                    raise Exception(f"Sorry, unsupported marker: '{marker}'. Please report to GitHub.")
                 glyph_fnc = mrk_fncs[marker]
             elif method == "bar":
                 kwglyphs['bottom'] = 0
@@ -257,11 +292,18 @@ class Figure(object):
             else:
                 self._add_hover_renderer(renderer)
 
-            hover_target = None
-            is_obs = isinstance(obj, bt.Observer)
-            if is_obs and master is None:
-                hover_target = self.figure
-            self._hoverc.add_hovertip(f"{indlabel} - {linealias}", f"@{source_id}{{{self._scheme.number_format}}}", hover_target)
+            hover_label = f"{indlabel} - {linealias}"
+            hover_data = f"@{source_id}{{{self._scheme.number_format}}}"
+            if not self._scheme.merge_data_hovers:
+                # add hover tooltip for indicators/observers's data
+                self._hoverc.add_hovertip_for_data(hover_label, hover_data, obj._clock)
+            else:
+                hover_target = None
+                is_obs = isinstance(obj, bt.Observer)
+                if is_obs and master is None:
+                    hover_target = self.figure
+                # add hover tooltip for all figures
+                self._hoverc.add_hovertip(hover_label, hover_data, hover_target)
 
             # adapt y-axis if needed
             if master is None or getattr(master.plotinfo, 'plotylimited', False) is False:
@@ -358,10 +400,12 @@ class Figure(object):
                                         line_color=source_id + 'colors_outline')
 
             self._set_single_hover_renderer(renderer)
-            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}")
-            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}")
-            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}")
-            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}")
+
+            hover_target = None if self._scheme.merge_data_hovers else self.figure
+            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
@@ -371,10 +415,10 @@ class Figure(object):
         if self._scheme.volume and self._scheme.voloverlay:
             self.plot_volume(data, strat_clk, self._scheme.voltrans, True)
 
-    def plot_volume(self, obj, strat_clk: array, alpha, extra_axis=False):
-        src_prefix = sanitize_source_name(obj._name)
+    def plot_volume(self, data: bt.feeds.DataBase, strat_clk: array, alpha, extra_axis=False):
+        source_id = Figure._source_id(data)
 
-        df = convert_to_pandas(strat_clk, obj, self._start, self._end)
+        df = convert_to_pandas(strat_clk, data, self._start, self._end)
 
         if len(nanfilt(df.volume)) == 0:
             return
@@ -385,8 +429,8 @@ class Figure(object):
         is_up = df.close > df.open
         colors = [colorup if x else colordown for x in is_up]
 
-        self._add_to_cds(df.volume, src_prefix + 'volume')
-        self._add_to_cds(colors, src_prefix + 'volume_colors')
+        self._add_to_cds(df.volume, f'{source_id}volume')
+        self._add_to_cds(colors, f'{source_id}volume_colors')
 
         kwargs = {'fill_alpha': alpha,
                   'line_alpha': alpha,
@@ -412,5 +456,7 @@ class Figure(object):
             adapt_yranges(self.figure.y_range, df.volume)
             self.figure.y_range.end /= self._scheme.volscaling
 
-        self.figure.vbar('index', get_bar_width(), src_prefix + 'volume', 0, source=self._cds, fill_color=src_prefix + 'volume_colors', line_color="black", **kwargs)
-        self._hoverc.add_hovertip("Volume", f"@{src_prefix}volume{{({self._scheme.number_format})}}")
+        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}volume_colors', line_color="black", **kwargs)
+
+        hover_target = None if self._scheme.merge_data_hovers else self.figure
+        self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", hover_target)

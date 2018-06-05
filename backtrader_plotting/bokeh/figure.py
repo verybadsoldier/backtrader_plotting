@@ -267,7 +267,7 @@ class Figure(object):
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
                 kwglyphs['fill_color'] = color
-                kwglyphs['width'] = get_bar_width(obj._clock)
+                kwglyphs['width'] = get_bar_width()
                 kwglyphs['top'] = source_id
 
                 glyph_fnc = self.figure.vbar

@@ -25,27 +25,6 @@ def get_bar_width() -> float:
     return 0.5
 
 
-def get_bar_width_ms(data) -> float:
-    """Calculates the width of one bar depending on current timeframe and compression. In milliseconds"""
-    if data._timeframe >= backtrader.TimeFrame.MicroSeconds:
-        width_ms = 0.001
-    if data._timeframe >= backtrader.TimeFrame.Seconds:
-        width_ms *= 1e6
-    if data._timeframe >= backtrader.TimeFrame.Minutes:
-        width_ms *= 60
-    if data._timeframe >= backtrader.TimeFrame.Days:
-        width_ms *= 60 * 24
-    if data._timeframe >= backtrader.TimeFrame.Weeks:
-        width_ms *= 7
-    if data._timeframe >= backtrader.TimeFrame.Months:
-        width_ms *= 30
-    if data._timeframe >= backtrader.TimeFrame.Years:
-        width_ms *= 12
-
-    width_ms *= data._compression
-    return width_ms
-
-
 _style_mpl2bokeh = {
     '-': 'solid',
     '--': 'dashed',

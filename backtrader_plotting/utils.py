@@ -19,10 +19,10 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     def get_value_str(name, value):
         if name == "timeframe":
             return bt.TimeFrame.getname(value, 1)
-        elif isinstance(value, int):
-            return str(value)
+        elif isinstance(value, float):
+            return "{value:.5f}".format(value=value)
         else:
-            return "{value:.2f}"
+            return str(value)
 
     plabs = [f"{x}: {get_value_str(x, y)}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)

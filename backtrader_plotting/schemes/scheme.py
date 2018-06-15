@@ -52,5 +52,11 @@ class Scheme(_BtPlotScheme):
 
         self.show_headline = True
 
+        """
+        hover tooltips of datas will contain all other datas and all indicators/observers
+        if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data
+        """
+        self.merge_data_hovers = True
+
         self.number_format = '0,0.000'
         self.number_format_volume = '0.00 a'

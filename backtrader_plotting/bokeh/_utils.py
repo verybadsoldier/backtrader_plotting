@@ -1,3 +1,4 @@
+from jinja2 import Environment, PackageLoader
 import backtrader
 import matplotlib.colors
 from backtrader_plotting.utils import nanfilt
@@ -22,27 +23,6 @@ def sanitize_source_name(name: str) -> str:
 
 def get_bar_width() -> float:
     return 0.5
-
-
-def get_bar_width_ms(data) -> float:
-    """Calculates the width of one bar depending on current timeframe and compression. In milliseconds"""
-    if data._timeframe >= backtrader.TimeFrame.MicroSeconds:
-        width_ms = 0.001
-    if data._timeframe >= backtrader.TimeFrame.Seconds:
-        width_ms *= 1e6
-    if data._timeframe >= backtrader.TimeFrame.Minutes:
-        width_ms *= 60
-    if data._timeframe >= backtrader.TimeFrame.Days:
-        width_ms *= 60 * 24
-    if data._timeframe >= backtrader.TimeFrame.Weeks:
-        width_ms *= 7
-    if data._timeframe >= backtrader.TimeFrame.Months:
-        width_ms *= 30
-    if data._timeframe >= backtrader.TimeFrame.Years:
-        width_ms *= 12
-
-    width_ms *= data._compression
-    return width_ms
 
 
 _style_mpl2bokeh = {
@@ -77,3 +57,25 @@ def adapt_yranges(y_range, data_min, data_max=None):
     if y_range.end is not None:
         dmax = max(dmax, y_range.end)
     y_range.end = dmax
+
+
+def generate_stylesheet(scheme, template="basic.css.j2") -> str:
+    env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
+    templ = env.get_template(template)
+
+    css = templ.render(dict(
+                             datatable_row_color_even=scheme.table_color_even,
+                             datatable_row_color_odd=scheme.table_color_odd,
+                             datatable_header_color=scheme.table_header_color,
+                             tab_active_background_color=scheme.tab_active_background_color,
+                             tab_active_color=scheme.tab_active_color,
+
+                             tooltip_background_color=scheme.tooltip_background_color,
+                             tooltip_text_color_label=scheme.tooltip_text_label_color,
+                             tooltip_text_color_value=scheme.tooltip_text_value_color,
+                             body_background_color=scheme.body_fill,
+                             headline_color=scheme.plot_title_text_color,
+                             text_color=scheme.text_color,
+                           )
+                      )
+    return css

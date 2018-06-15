@@ -150,7 +150,7 @@ class Figure(object):
         self.figure = f
 
     def plot(self, obj, strat_clk, master=None):
-        if isinstance(obj, bt.feeds.DataBase):
+        if isinstance(obj, bt.feed.AbstractDataBase):
             self.plot_data(obj, master, strat_clk)
             height_set = self._scheme.plot_height_data
         elif isinstance(obj, bt.indicator.Indicator):

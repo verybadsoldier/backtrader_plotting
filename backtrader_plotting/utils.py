@@ -19,8 +19,8 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     def get_value_str(name, value):
         if name == "timeframe":
             return bt.TimeFrame.getname(value, 1)
-        elif isinstance(value, int):
-            return str(value)
+        elif isinstance(value, float):
+            return "{value:.5f}".format(value=value)
         else:
             return f"{value:.2f}"
 
@@ -70,7 +70,7 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime=None, end: 
         data = line.plotrange(start, end)
 
         ndata = resample_line(data, obj.lines.datetime.plotrange(start, end), strat_clk)
-        logging.info(f"Filled_line: {linealias}: {str(ndata)}")
+        logging.debug(f"Filled_line: {linealias}: {str(ndata)}")
 
         df[name_prefix + linealias] = ndata
 

@@ -81,10 +81,10 @@ class Figure(object):
         if self._hover_line_set:
             return
 
-        if isinstance(self._hover.renderers, list) != True:
-            self._hover.renderers = [ren]
-        else:
+        if isinstance(self._hover.renderers, list):
             self._hover.renderers.append(ren)
+        else:
+            self._hover.renderers = [ren]
 
     def _nextcolor(self, key: object=None) -> None:
         self._coloridx[key] += 1

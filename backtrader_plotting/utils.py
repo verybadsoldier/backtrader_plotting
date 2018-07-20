@@ -21,6 +21,8 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
             return bt.TimeFrame.getname(value, 1)
         elif isinstance(value, int):
             return str(value)
+        elif isinstance(value, list):
+            return ','.join(value)
         else:
             return f"{value:.2f}"
 

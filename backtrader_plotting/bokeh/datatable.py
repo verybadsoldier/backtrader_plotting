@@ -50,7 +50,7 @@ class TableGenerator(object):
         else:
             raise Exception(f"Unsupported ColumnDataType: '{ctype}'")
 
-    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer) -> (Paragraph, List[DataTable]):
+    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer, table_width) -> (Paragraph, List[DataTable]):
         if hasattr(analyzer, 'get_analysis_table'):
             title, table_columns_list = analyzer.get_analysis_table()
         else:
@@ -70,5 +70,5 @@ class TableGenerator(object):
                 cds.add(c[2:], col_name)
                 columns.append(TableColumn(field=col_name, title=c[0], formatter=self._get_formatter(c[1])))
             column_height = len(table_columns[0]) * 25
-            elems.append(DataTable(source=cds, columns=columns, width=self._scheme.table_width, height=column_height, index_position=None))
-        return Paragraph(text=title, width=self._scheme.table_width, style={'font-size': 'large'}), elems
+            elems.append(DataTable(source=cds, columns=columns, width=table_width, height=column_height, index_position=None))
+        return Paragraph(text=title, width=table_width, style={'font-size': 'large'}), elems

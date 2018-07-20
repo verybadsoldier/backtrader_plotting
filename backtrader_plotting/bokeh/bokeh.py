@@ -93,25 +93,26 @@ class Bokeh(metaclass=bt.MetaParams):
                     self._data_graph[pmaster] = []
                 self._data_graph[pmaster].append(o)
 
-        for i in inds:
-            if not hasattr(i, 'plotinfo'):
+        for ind in inds:
+            if not hasattr(ind, 'plotinfo'):
                 # no plotting support - so far LineSingle derived classes
                 continue
 
             # should this indicator be plotted?
-            if not i.plotinfo.plot or i.plotinfo.plotskip:
+            if not ind.plotinfo.plot or ind.plotinfo.plotskip:
                 continue
 
-            subplot = i.plotinfo.subplot
+            # subplot = create a new figure for this indicator
+            subplot = ind.plotinfo.subplot
             if subplot:
-                self._data_graph[i] = []
+                self._data_graph[ind] = []
             else:
-                pm = i.plotinfo.plotmaster if i.plotinfo.plotmaster is not None else i.data
+                pm = ind.plotinfo.plotmaster if ind.plotinfo.plotmaster is not None else ind.data
                 pm = get_data_obj(pm)
                 pmaster = Bokeh._resolve_plotmaster(pm)
                 if pmaster not in self._data_graph:
                     self._data_graph[pmaster] = []
-                self._data_graph[pmaster].append(i)
+                self._data_graph[pmaster].append(ind)
 
     @property
     def figures(self):
@@ -339,22 +340,24 @@ class Bokeh(metaclass=bt.MetaParams):
         if len(fp.analyzers) == 0:
             return None
 
-        col_childs = [[], []]
+        table_width = int(self.p.scheme.analyzer_tab_width / self.p.scheme.analyzer_tab_num_cols)
+        col_childs = []
+        for _ in range(0, self.p.scheme.analyzer_tab_num_cols):
+            col_childs.append([])
+
         for a in fp.analyzers:
-            table_header, elements = self._tablegen.get_analyzers_tables(a)
+            table_header, elements = self._tablegen.get_analyzers_tables(a, table_width)
 
-            col0cnt = _get_column_row_count(col_childs[0])
-            col1cnt = _get_column_row_count(col_childs[1])
-            col_idx = 0 if col0cnt <= col1cnt else 1
-            col_childs[col_idx] += [table_header] + elements
+            col_childs = sorted(col_childs, key=lambda x: _get_column_row_count(x))
+            col_childs[0] += [table_header] + elements
 
-        column1 = column(children=col_childs[0], sizing_mode='fixed')
-        childs = [column1]
-        if len(col_childs[1]) > 0:
-            column2 = column(children=col_childs[1], sizing_mode='fixed')
-            childs.append(column2)
+        childs = []
+        for c in col_childs:
+            if len(c) == 0:
+                break
+            childs.append(column(children=c, sizing_mode='fixed'))
+
         childs = row(children=childs, sizing_mode='fixed')
-
         return Panel(child=childs, title="Analyzers")
 
     def _output_stylesheet(self, template="basic.css.j2"):

@@ -35,7 +35,8 @@ class Scheme(_BtPlotScheme):
         self.table_header_color = '#7a7a7a'
 
         self.plot_width = 1800
-        self.table_width = 930
+        self.analyzer_tab_width = 1860
+        self.analyzer_tab_num_cols = 2
         self.plot_height_data = 800
         self.plot_height_indicator = 400
         self.plot_height_observer = 400

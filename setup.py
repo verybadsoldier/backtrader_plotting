@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name='backtrader_plotting',
 
-    version=0.4,
+    version=0.5,
 
     description='Plotting package for Backtrader (Bokeh, Plotly)',
 

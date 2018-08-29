@@ -10,16 +10,6 @@ https://community.backtrader.com/topic/813/bokeh-integration-interactive-webbrow
 ## Demos
 https://verybadsoldier.github.io/backtrader_plotting/
 
-## Installation
-
-Clone the repository:
-
-`git clone https://github.com/verybadsoldier/backtrader_plotting.git`
-
-It is recommended to install the package in development mode so there will be only a link created in the python directory to your cloned repository. So updating your checkout directory will immediately take effect:
-
-`python setup.py install develop`
-
 ## Quickstart
 
 ```python

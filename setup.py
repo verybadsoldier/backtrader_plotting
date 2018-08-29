@@ -2,18 +2,25 @@
 # -*- coding: utf-8; py-indent-offset:4 -*-
 import setuptools
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setuptools.setup(
     name='backtrader_plotting',
 
-    version=0.1,
+    version=0.4,
 
     description='Plotting package for Backtrader (Bokeh, Plotly)',
 
+    python_requires='>3.6',
+    
     # Author details
     author='verybadsolider',
     author_email='vbs@springrts.de',
 
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    
     # Choose your license
     license='GPLv3+',
 

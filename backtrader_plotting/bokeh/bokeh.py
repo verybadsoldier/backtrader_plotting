@@ -1,4 +1,4 @@
-from ._utils import generate_stylesheet
+from .utils import generate_stylesheet
 import bisect
 import os
 import sys
@@ -8,22 +8,24 @@ import datetime
 from typing import List, Dict, Callable
 import backtrader as bt
 from bokeh.models import ColumnDataSource, Model
-from bokeh.models.widgets import Panel, Tabs, Select, DataTable, TableColumn
+from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn
 from bokeh.layouts import column, gridplot, row
 from bokeh.server.server import Server
 from bokeh.document import Document
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
 from backtrader_plotting.utils import get_data_obj
+from .. import bttypes
 
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
 from ..schemes.scheme import Scheme
 from bokeh.embed import file_html
+from bokeh.models.widgets import NumberFormatter
 from bokeh.resources import CDN
 from bokeh.util.browser import view
-from typing import Optional, Union, Tuple
+from typing import Optional, Union
 import logging
 from array import array
 
@@ -150,43 +152,28 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return start, end
 
-    @staticmethod
-    def _is_valid_result(result: List):
-        """Raises if result is not a list. Return False if result is empty."""
-        if not isinstance(result, List):
-            raise Exception("'result' has to be a List")
-        return len(result) != 0
-
-    def generate_result_model(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None) -> Model:
+    def generate_result_model(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, num_item_limit=None) -> Model:
         """Generates a model from a result object"""
-        if not Bokeh._is_valid_result(result):
+        if not bttypes.is_valid_result(result):
             return
 
-        if Bokeh._is_optresult(result):
-            return self.generate_optresult_model(result, columns)
-        elif Bokeh._is_btresult(result):
+        if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
+            return self.generate_optresult_model(result, columns, num_item_limit)
+        elif bttypes.is_btresult(result):
             for s in result:
                 self.plot(s)
             return self.generate_model()
         else:
             raise Exception(f"Unsupported result type: {str(result)}")
 
-    @staticmethod
-    def _is_optresult(result: Union[List[bt.Strategy], List[List[bt.OptReturn]]]):
-        return isinstance(result[0], List) and len(result[0]) > 0 and isinstance(result[0][0], (bt.OptReturn, bt.Strategy))
-
-    @staticmethod
-    def _is_btresult(result: Union[List[bt.Strategy], List[List[bt.OptReturn]]]):
-        return isinstance(result[0], bt.Strategy)
-
     def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None):
         """Plots a cerebro result. Pass either a list of strategies or a list of list of optreturns"""
-        if not Bokeh._is_valid_result(result):
+        if not bttypes.is_valid_result(result):
             return
 
-        if Bokeh._is_optresult(result):
+        if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
             self.run_optresult_server(result, columns)
-        elif Bokeh._is_btresult(result):
+        elif bttypes.is_btresult(result):
             for s in result:
                 self.plot(s)
             self.show()
@@ -407,7 +394,7 @@ class Bokeh(metaclass=bt.MetaParams):
                 raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
             self._fp.analyzers = [a for _, a in obj.analyzers.getitems()]
         else:
-            raise Exception(f'Unsupported plot source object: {type(obj)}')
+            raise Exception(f'Unsupported plot source object: {str(type(obj))}')
         return [self._fp]
 
     def show(self):
@@ -428,57 +415,73 @@ class Bokeh(metaclass=bt.MetaParams):
     def _reset(self):
         self._fp = FigurePage()
 
-    def generate_optresult_model(self, optresult: List[List[bt.OptReturn]], columns=None) -> Model:
-        """Generates and returns an interactive model"""
-        #o = list(self._options.keys())
-        #selector = Select(title="Result:", value="result", options=o)
+    @staticmethod
+    def _get_limited_optresult(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult], num_item_limit=None):
+        if num_item_limit is None:
+            return optresult
+        return optresult[0:num_item_limit]
 
+    @staticmethod
+    def _get_opt_count(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult]):
+        if isinstance(optresult[0], dict):
+            # OrderedOptResult
+            return len(optresult['optresult'][0]['result'])
+        else:
+            # OptResult
+            return len(optresult[0])
+
+    def generate_optresult_model(self, optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult], columns=None, num_item_limit=None) -> Model:
+        """Generates and returns an interactive model for an OptResult or an OrderedOptResult"""
         cds = ColumnDataSource()
         tab_columns = []
 
-        for idx, strat in enumerate(optresult[0]):
+        col_formatter = NumberFormatter(format='0.000')
+        opts = optresult if bttypes.is_optresult(optresult) else [x['result'] for x in optresult['optresult']]
+        if bttypes.is_ordered_optresult(optresult):
+            benchmarks = [x['benchmark'] for x in Bokeh._get_limited_optresult(optresult['optresult'], num_item_limit)]
+            cds.add(benchmarks, "benchmark")
+            tab_columns.append(TableColumn(field='benchmark', title=optresult['benchmark_label'], sortable=False, formatter=col_formatter))
+
+        for idx, strat in enumerate(opts[0]):
             # add suffix when dealing with more than 1 strategy
             strat_suffix = ''
-            if len(optresult[0]):
+            if len(opts[0]) > 1:
                 strat_suffix = f' [{idx}]'
 
             for name, val in strat.params._getitems():
-                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}'))
+                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}', sortable=False, formatter=col_formatter))
 
                 # get value for the current param for all results
                 pvals = []
-                for res in optresult:
-                    pvals.append(res[idx].params._get(name))
+                for opt in Bokeh._get_limited_optresult(opts, num_item_limit):
+                    pvals.append(opt[idx].params._get(name))
                 cds.add(pvals, f"{idx}_{name}")
 
         # add user columns specified by parameter 'columns'
         if columns is not None:
             for k, v in columns.items():
-                ll = [str(v(x)) for x in optresult]
+                ll = [str(v(x)) for x in Bokeh._get_limited_optresult(optresult, num_item_limit)]
                 cds.add(ll, k)
-                tab_columns.append(TableColumn(field=k, title=k))
+                tab_columns.append(TableColumn(field=k, title=k, sortable=False, formatter=col_formatter))
 
-        selector = DataTable(source=cds, columns=tab_columns, width=1600, height=160)
+        selector = DataTable(source=cds, columns=tab_columns, width=1600, height=150)
 
-        model = column([selector, self.plot_and_generate_model(optresult[idx])])
+        model = column([selector, self.plot_and_generate_model(opts[0])])
 
-        def update(name, old, new):
-            if len(new['1d']['indices']) == 0:
+        def update(_name, _old, new):
+            if len(new) == 0:
                 return
 
-            stratidx = new['1d']['indices'][0]
-            model.children[-1] = self.plot_and_generate_model(optresult[stratidx])
+            stratidx = new[0]
+            model.children[-1] = self.plot_and_generate_model(opts[stratidx])
 
-        cds.on_change('selected', update)
+        cds.selected.on_change('indices', update)
         return model
 
-    def run_optresult_server(self, result: List[List[bt.OptReturn]], columns: Dict[str, Callable]=None):
+    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None):
         """Serves an optimization resulst as a Bokeh application running on a web server"""
         if len(result) == 0:
             return
-
-        if not isinstance(result[0], List):
-            raise Exception("Passes 'result' object is no optimization result!")
 
         def make_document(doc: Document):
             doc.title = "Backtrader Optimization Result"

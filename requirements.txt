@@ -1,0 +1,5 @@
+bokeh==0.13
+jinja2
+backtrader
+plotly
+pandas

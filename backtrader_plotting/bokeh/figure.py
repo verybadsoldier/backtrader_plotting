@@ -1,11 +1,11 @@
-from typing import List, Union
+from typing import Union
 import collections
 from array import array
 
 import backtrader as bt
 
 from backtrader_plotting.utils import get_strategy_label, get_data_obj
-from ._utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
+from .utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
 from bokeh.models import Span
@@ -60,7 +60,7 @@ class Figure(object):
         self._start = start
         self._end = end
         self.figure = None
-        self._hover = None
+        self._hover: HoverTool = None
         self._coloridx = collections.defaultdict(lambda: -1)
         self._hover_line_set = False
         self.master_type = master_type
@@ -85,6 +85,7 @@ class Figure(object):
             self._hover.renderers.append(ren)
         else:
             self._hover.renderers = [ren]
+
 
     def _nextcolor(self, key: object=None) -> None:
         self._coloridx[key] += 1

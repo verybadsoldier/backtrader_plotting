@@ -10,7 +10,7 @@ setuptools.setup(
 
     version=0.5,
 
-    description='Plotting package for Backtrader (Bokeh, Plotly)',
+    description='Plotting package for Backtrader (Bokeh)',
 
     python_requires='>3.6',
     
@@ -30,4 +30,12 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     
     package_data={'backtrader_plotting.bokeh': ['templates/*.j2']},
+
+    install_requires=[
+        'bokeh==0.13',
+        'jinja2',
+        'backtrader',
+        'plotly',
+        'pandas'
+    ],
 )

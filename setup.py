@@ -36,6 +36,7 @@ setuptools.setup(
         'jinja2',
         'backtrader',
         'plotly',
-        'pandas'
+        'pandas',
+        'matplotlib',
     ],
 )

@@ -42,7 +42,16 @@ def test_optimize(cerebro: bt.Cerebro):
     res = cerebro.run()
 
     b = Bokeh(style='bar', plot_mode='single')
-    b.plot_result(res)
+    model = b.generate_optresult_model(res)
 
+    def count_children(obj):
+        numo = 1
+        if hasattr(obj, "children"):
+            numo = count_children(obj.children)
+        if hasattr(obj, '__len__'):
+            numo += len(obj)
+        return numo
 
-test_optimize(cerebro())
+    num = count_children(model)
+
+    assert num == 3

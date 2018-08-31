@@ -169,13 +169,13 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise Exception(f"Unsupported result type: {str(result)}")
 
-    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None):
+    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, ioloop=None):
         """Plots a cerebro result. Pass either a list of strategies or a list of list of optreturns"""
         if not bttypes.is_valid_result(result):
             return
 
         if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
-            self.run_optresult_server(result, columns)
+            self.run_optresult_server(result, columns, ioloop=ioloop)
         elif bttypes.is_btresult(result):
             for s in result:
                 self.plot(s)
@@ -503,7 +503,7 @@ class Bokeh(metaclass=bt.MetaParams):
         cds.selected.on_change('indices', update)
         return model
 
-    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None):
+    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None, ioloop=None):
         """Serves an optimization resulst as a Bokeh application running on a web server"""
         if len(result) == 0:
             return
@@ -517,10 +517,10 @@ class Bokeh(metaclass=bt.MetaParams):
             model = self.generate_optresult_model(result, columns)
             doc.add_root(model)
 
-        Bokeh._run_server(make_document)
+        Bokeh._run_server(make_document, ioloop=ioloop)
 
     @staticmethod
-    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80):
+    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):
         """Runs a Bokeh webserver application. Documents will be created using fnc_make_document"""
         handler = FunctionHandler(fnc_make_document)
         app = Application(handler)
@@ -530,6 +530,6 @@ class Bokeh(metaclass=bt.MetaParams):
             apps = {'/': app}
 
             print("Open your browser here: http://localhost")
-            server = Server(apps, port=port)
+            server = Server(apps, port=port, io_loop=ioloop)
             server.run_until_shutdown()
     #  endregion

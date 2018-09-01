@@ -12,7 +12,7 @@ setuptools.setup(
 
     description='Plotting package for Backtrader (Bokeh)',
 
-    python_requires='>3.6',
+    python_requires='>=3.6',
     
     # Author details
     author='verybadsolider',

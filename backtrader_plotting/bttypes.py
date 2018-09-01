@@ -19,20 +19,16 @@ class OrderedOptResult:
 
 
 def is_btresult(result: Union[BtResult, OptResult, OrderedOptResult]):
-    return isinstance(result, List) and isinstance(result[0], bt.Strategy)
+    return isinstance(result, List) and isinstance(result[0], bt.Strategy) and len(result) > 0
 
 
 def is_optresult(result: Union[BtResult, OptResult, OrderedOptResult]):
-    return isinstance(result, List) and isinstance(result[0], List) and len(result[0]) > 0 and isinstance(result[0][0], (bt.OptReturn, bt.Strategy))
+    return isinstance(result, List) and \
+           isinstance(result[0], List) and \
+           len(result[0]) > 0 and \
+           isinstance(result[0][0], (bt.OptReturn, bt.Strategy)) and \
+           len(result) > 0
 
 
 def is_ordered_optresult(result: Union[BtResult, OptResult, OrderedOptResult]):
-    return isinstance(result, dict) and isinstance(result['optresult'][0], Dict)
-
-
-def is_valid_result(result: List):
-    """Raises if result is not a list. Return False if result is empty."""
-    val_fncs = [is_btresult, is_optresult, is_ordered_optresult]
-    if not any([x(result) for x in val_fncs]):
-        raise Exception("'result' is not a valid result object")
-    return len(result) != 0
+    return isinstance(result, OrderedOptResult)

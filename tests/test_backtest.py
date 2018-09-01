@@ -55,3 +55,36 @@ def test_optimize(cerebro: bt.Cerebro):
     num = count_children(model)
 
     assert num == 3
+
+
+def test_ordered_optimize(cerebro: bt.Cerebro):
+    from backtrader_plotting import Bokeh
+    from backtrader_plotting.bttypes import OrderedOptResult
+
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
+    cerebro.optstrategy(bt.strategies.MA_CrossOver, slow=[5, 10, 20], fast=[5, 10, 20])
+    res = cerebro.run()
+
+    def benchmark(optresults):
+        a = [x.analyzers.tradeanalyzer.get_analysis() for x in optresults]
+        return sum([x.pnl.gross.total if 'pnl' in x else 0 for x in a])
+
+    result = [OrderedOptResult.BenchmarkedResult(benchmark(x), x) for x in res]
+    ordered_result = sorted(result, key=lambda x: x.benchmark, reverse=True)
+
+    ordered_result = OrderedOptResult("Profit & Losss", ordered_result)
+
+    b = Bokeh(style='bar', plot_mode='single')
+    model = b.generate_optresult_model(ordered_result)
+
+    def count_children(obj):
+        numo = 1
+        if hasattr(obj, "children"):
+            numo = count_children(obj.children)
+        if hasattr(obj, '__len__'):
+            numo += len(obj)
+        return numo
+
+    num = count_children(model)
+
+    assert num == 3

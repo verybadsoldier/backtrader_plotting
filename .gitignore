@@ -4,3 +4,4 @@ backtrader_plotting.egg-info
 /dist
 /tests/.pytest_cache
 /.idea
+/.pytest_cache

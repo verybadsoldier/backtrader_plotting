@@ -1,2 +1,6 @@
 __pycache__
 backtrader_plotting.egg-info
+/build
+/dist
+/tests/.pytest_cache
+/.idea

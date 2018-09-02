@@ -1,9 +1,11 @@
-import backtrader as bt
-from typing import Dict, Optional, List, Union
-import math
 from datetime import datetime
-import pandas
 import logging
+import math
+from typing import Dict, Optional, List, Union
+
+import backtrader as bt
+
+import pandas
 
 
 _logger = logging.getLogger(__name__)

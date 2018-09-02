@@ -1,5 +1,5 @@
 import backtrader as bt
-from typing import Union, List, Dict, Any
+from typing import Union, List
 
 
 BtResult = List[bt.Strategy]  # backtrader backtest result

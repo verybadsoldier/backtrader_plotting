@@ -21,6 +21,8 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     def get_value_str(name, value):
         if name == "timeframe":
             return bt.TimeFrame.getname(value, 1)
+        elif isinstance(value, str):
+            return value
         elif isinstance(value, int):
             return str(value)
         elif isinstance(value, list):

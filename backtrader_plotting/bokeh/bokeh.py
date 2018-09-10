@@ -1,12 +1,16 @@
-from .utils import generate_stylesheet
+from array import array
 import bisect
+import datetime
+import inspect
+import logging
 import os
 import sys
 import tempfile
-from jinja2 import Environment, PackageLoader
-import datetime
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional, Union
+
 import backtrader as bt
+from backtrader_plotting.utils import get_data_obj
+
 from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn
 from bokeh.layouts import column, gridplot, row
@@ -14,20 +18,19 @@ from bokeh.server.server import Server
 from bokeh.document import Document
 from bokeh.application import Application
 from bokeh.application.handlers.function import FunctionHandler
-from backtrader_plotting.utils import get_data_obj
-from .. import bttypes
+from bokeh.embed import file_html
+from bokeh.models.widgets import NumberFormatter, StringFormatter
+from bokeh.resources import CDN
+from bokeh.util.browser import view
 
+from jinja2 import Environment, PackageLoader
+
+from .utils import generate_stylesheet
+from .. import bttypes
 from .figure import Figure, HoverContainer
 from .datatable import TableGenerator
 from ..schemes import Blackly
 from ..schemes.scheme import Scheme
-from bokeh.embed import file_html
-from bokeh.models.widgets import NumberFormatter
-from bokeh.resources import CDN
-from bokeh.util.browser import view
-from typing import Optional, Union
-import logging
-from array import array
 
 _logger = logging.getLogger(__name__)
 
@@ -154,9 +157,6 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def generate_result_model(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, num_item_limit=None) -> Model:
         """Generates a model from a result object"""
-        if not bttypes.is_valid_result(result):
-            return
-
         if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
             return self.generate_optresult_model(result, columns, num_item_limit)
         elif bttypes.is_btresult(result):
@@ -166,13 +166,10 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise Exception(f"Unsupported result type: {str(result)}")
 
-    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None):
-        """Plots a cerebro result. Pass either a list of strategies or a list of list of optreturns"""
-        if not bttypes.is_valid_result(result):
-            return
-
+    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, ioloop=None):
+        """Plot a cerebro result. Pass either a list of strategies or a list of list of optreturns."""
         if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
-            self.run_optresult_server(result, columns)
+            self.run_optresult_server(result, columns, ioloop=ioloop)
         elif bttypes.is_btresult(result):
             for s in result:
                 self.plot(s)
@@ -293,7 +290,15 @@ class Bokeh(metaclass=bt.MetaParams):
         if panel_analyzers is not None:
             panels.append(panel_analyzers)
 
+        if len(panels) == 0:
+            panels.append(Bokeh._get_nodata_panel())
+
         return Tabs(tabs=panels)
+
+    @staticmethod
+    def _get_nodata_panel():
+        chart_grid = gridplot([], sizing_mode='fixed', toolbar_location='right', toolbar_options={'logo': None})
+        return Panel(child=chart_grid, title="No Data")
 
     def _generate_model_tabs(self, fp: FigurePage):
         figs = list(fp.figures)
@@ -316,6 +321,9 @@ class Bokeh(metaclass=bt.MetaParams):
         p_analyzers = self._get_analyzer_tab(fp)
         if p_analyzers is not None:
             panels.append(p_analyzers)
+
+        if len(panels) == 0:
+            panels.append(Bokeh._get_nodata_panel())
 
         return Tabs(tabs=panels)
     # endregion
@@ -378,8 +386,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
     #  region interface for backtrader
     def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, **kwargs):
-        """Called by backtrader to plot either a strategy or an optimization results"""
-
+        """Called by backtrader to plot either a strategy or an optimization result."""
         if numfigs > 1:
             raise Exception("numfigs must be 1")
         if use is not None:
@@ -392,13 +399,15 @@ class Bokeh(metaclass=bt.MetaParams):
         elif isinstance(obj, bt.OptReturn):
             if not hasattr(obj, 'strategycls'):
                 raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
+
+            # for optresults we only plot analyzers!
             self._fp.analyzers = [a for _, a in obj.analyzers.getitems()]
         else:
             raise Exception(f'Unsupported plot source object: {str(type(obj))}')
         return [self._fp]
 
     def show(self):
-        """Called by backtrader to display a figure"""
+        """Display a figure (called by backtrader)."""
         model = self.generate_model()
         if self._iplot:
             css = self._output_stylesheet()
@@ -435,12 +444,13 @@ class Bokeh(metaclass=bt.MetaParams):
         cds = ColumnDataSource()
         tab_columns = []
 
-        col_formatter = NumberFormatter(format='0.000')
-        opts = optresult if bttypes.is_optresult(optresult) else [x['result'] for x in optresult['optresult']]
+        col_formatter_num = NumberFormatter(format='0.000')
+        col_formatter_str = StringFormatter()
+        opts = optresult if bttypes.is_optresult(optresult) else [x.result for x in optresult.optresult]
         if bttypes.is_ordered_optresult(optresult):
-            benchmarks = [x['benchmark'] for x in Bokeh._get_limited_optresult(optresult['optresult'], num_item_limit)]
+            benchmarks = [x.benchmark for x in Bokeh._get_limited_optresult(optresult.optresult, num_item_limit)]
             cds.add(benchmarks, "benchmark")
-            tab_columns.append(TableColumn(field='benchmark', title=optresult['benchmark_label'], sortable=False, formatter=col_formatter))
+            tab_columns.append(TableColumn(field='benchmark', title=optresult.benchmark_label, sortable=False, formatter=col_formatter_num))
 
         for idx, strat in enumerate(opts[0]):
             # add suffix when dealing with more than 1 strategy
@@ -449,12 +459,21 @@ class Bokeh(metaclass=bt.MetaParams):
                 strat_suffix = f' [{idx}]'
 
             for name, val in strat.params._getitems():
-                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}', sortable=False, formatter=col_formatter))
-
                 # get value for the current param for all results
                 pvals = []
+                formatter = col_formatter_num
                 for opt in Bokeh._get_limited_optresult(opts, num_item_limit):
-                    pvals.append(opt[idx].params._get(name))
+                    param = opt[idx].params._get(name)
+                    if inspect.isclass(param):
+                        paramstr = param.__name__
+                    else:
+                        paramstr = param
+                    pvals.append(paramstr)
+
+                if len(pvals) > 0 and isinstance(pvals[0], str):
+                    formatter = col_formatter_str
+                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}', sortable=False, formatter=formatter))
+
                 cds.add(pvals, f"{idx}_{name}")
 
         # add user columns specified by parameter 'columns'
@@ -462,7 +481,7 @@ class Bokeh(metaclass=bt.MetaParams):
             for k, v in columns.items():
                 ll = [str(v(x)) for x in Bokeh._get_limited_optresult(optresult, num_item_limit)]
                 cds.add(ll, k)
-                tab_columns.append(TableColumn(field=k, title=k, sortable=False, formatter=col_formatter))
+                tab_columns.append(TableColumn(field=k, title=k, sortable=False, formatter=col_formatter_str))
 
         selector = DataTable(source=cds, columns=tab_columns, width=1600, height=150)
 
@@ -478,11 +497,8 @@ class Bokeh(metaclass=bt.MetaParams):
         cds.selected.on_change('indices', update)
         return model
 
-    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None):
+    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None, ioloop=None):
         """Serves an optimization resulst as a Bokeh application running on a web server"""
-        if len(result) == 0:
-            return
-
         def make_document(doc: Document):
             doc.title = "Backtrader Optimization Result"
 
@@ -492,10 +508,10 @@ class Bokeh(metaclass=bt.MetaParams):
             model = self.generate_optresult_model(result, columns)
             doc.add_root(model)
 
-        Bokeh._run_server(make_document)
+        Bokeh._run_server(make_document, ioloop=ioloop)
 
     @staticmethod
-    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80):
+    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):
         """Runs a Bokeh webserver application. Documents will be created using fnc_make_document"""
         handler = FunctionHandler(fnc_make_document)
         app = Application(handler)
@@ -505,6 +521,6 @@ class Bokeh(metaclass=bt.MetaParams):
             apps = {'/': app}
 
             print("Open your browser here: http://localhost")
-            server = Server(apps, port=port)
+            server = Server(apps, port=port, io_loop=ioloop)
             server.run_until_shutdown()
     #  endregion

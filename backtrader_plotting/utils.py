@@ -1,9 +1,11 @@
-import backtrader as bt
-from typing import Dict, Optional, List, Union
-import math
 from datetime import datetime
-import pandas
 import logging
+import math
+from typing import Dict, Optional, List, Union
+
+import backtrader as bt
+
+import pandas
 
 
 _logger = logging.getLogger(__name__)
@@ -19,6 +21,8 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     def get_value_str(name, value):
         if name == "timeframe":
             return bt.TimeFrame.getname(value, 1)
+        elif isinstance(value, str):
+            return value
         elif isinstance(value, int):
             return str(value)
         elif isinstance(value, list):

@@ -397,9 +397,6 @@ class Bokeh(metaclass=bt.MetaParams):
         if isinstance(obj, bt.Strategy):
             self._blueprint_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
-            if not hasattr(obj, 'strategycls'):
-                raise Exception("Missing field 'strategycls' in OptReturn. Include this commit in your backtrader package to fix it: 'https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb'")
-
             # for optresults we only plot analyzers!
             self._fp.analyzers = [a for _, a in obj.analyzers.getitems()]
         else:

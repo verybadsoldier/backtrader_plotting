@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name='backtrader_plotting',
 
-    version='0.5.2b1',
+    version='0.5.3',
 
     description='Plotting package for Backtrader (Bokeh)',
 
@@ -32,7 +32,7 @@ setuptools.setup(
     package_data={'backtrader_plotting.bokeh': ['templates/*.j2']},
 
     install_requires=[
-        'bokeh==0.13',
+        'bokeh~=1.0.0',
         'jinja2',
         'backtrader',
         'pandas',

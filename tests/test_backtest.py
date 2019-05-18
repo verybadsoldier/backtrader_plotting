@@ -1,9 +1,7 @@
-import backtrader as bt
 import datetime
+
+import backtrader as bt
 import pytest
-import threading
-import time
-import tornado.ioloop
 
 
 @pytest.fixture

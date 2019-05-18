@@ -9,7 +9,6 @@ import tempfile
 from typing import List, Dict, Callable, Optional, Union
 
 import backtrader as bt
-from backtrader_plotting.utils import get_data_obj
 
 from bokeh.models import ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn
@@ -113,7 +112,6 @@ class Bokeh(metaclass=bt.MetaParams):
                 self._data_graph[ind] = []
             else:
                 pm = ind.plotinfo.plotmaster if ind.plotinfo.plotmaster is not None else ind.data
-                pm = get_data_obj(pm)
                 pmaster = Bokeh._resolve_plotmaster(pm)
                 if pmaster not in self._data_graph:
                     self._data_graph[pmaster] = []

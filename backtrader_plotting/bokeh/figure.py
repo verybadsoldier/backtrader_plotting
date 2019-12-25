@@ -239,7 +239,7 @@ class Figure(object):
             kwglyphs = {'name': linealias}
 
             dataline = line.plotrange(self._start, self._end)
-            line_clk = get_data_obj(obj._clock).lines.datetime.plotrange(self._start, self._end)
+            line_clk = get_data_obj(obj).lines.datetime.plotrange(self._start, self._end)
             dataline = resample_line(dataline, line_clk, strat_clk)
             self._add_to_cds(dataline, source_id)
 

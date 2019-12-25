@@ -84,12 +84,9 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime=None, end: 
     return df
 
 
-def get_data_obj(ind: Union[bt.Indicator, bt.LineSeriesStub]):
+def get_data_obj(obj):
     """obj can be a data object or just a single line (in case indicator was created with an explicit line)"""
-    while True:
-        if isinstance(ind, bt.LineSeriesStub):
-            return ind.owner
-        elif isinstance(ind, bt.Indicator):
-            ind = ind.data
-        else:
-            return ind
+    if obj._owner is not None:
+        return obj._owner
+    else:
+        return obj

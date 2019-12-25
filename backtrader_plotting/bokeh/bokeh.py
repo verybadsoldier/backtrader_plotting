@@ -272,7 +272,7 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise Exception(f"Unsupported plot mode: {self.p.scheme.plot_mode}")
 
-    def _generate_model_single(self, fp: FigurePage):
+    def _generate_model_single(self, fp: FigurePage) -> Tabs:
         """Print all figures in one column. Plot observers first, then all plotabove then rest"""
         figs = list(fp.figures)
         observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
@@ -283,7 +283,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
         panels = []
         if len(figs) > 0:
-            chart_grid = gridplot([[x] for x in figs], sizing_mode='fixed', toolbar_location='right', toolbar_options={'logo': None})
+            chart_grid = gridplot([[x] for x in figs], toolbar_options={'logo': None})
             panels.append(Panel(child=chart_grid, title="Charts"))
 
         panel_analyzers = self._get_analyzer_tab(fp)
@@ -297,7 +297,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
     @staticmethod
     def _get_nodata_panel():
-        chart_grid = gridplot([], sizing_mode='fixed', toolbar_location='right', toolbar_options={'logo': None})
+        chart_grid = gridplot([], toolbar_location='right', toolbar_options={'logo': None})
         return Panel(child=chart_grid, title="No Data")
 
     def _generate_model_tabs(self, fp: FigurePage):
@@ -311,7 +311,7 @@ class Bokeh(metaclass=bt.MetaParams):
         def add_panel(obj, title):
             if len(obj) == 0:
                 return
-            g = gridplot([[x.figure] for x in obj], sizing_mode='fixed', toolbar_location='left', toolbar_options={'logo': None})
+            g = gridplot([[x.figure] for x in obj], toolbar_options={'logo': None}, toolbar_location='right')
             panels.append(Panel(title=title, child=g))
 
         add_panel(datas, "Datas")
@@ -350,9 +350,9 @@ class Bokeh(metaclass=bt.MetaParams):
         for c in col_childs:
             if len(c) == 0:
                 break
-            childs.append(column(children=c, sizing_mode='fixed'))
+            childs.append(column(children=c))
 
-        childs = row(children=childs, sizing_mode='fixed')
+        childs = row(children=childs)
         return Panel(child=childs, title="Analyzers")
 
     def _output_stylesheet(self, template="basic.css.j2"):

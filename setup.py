@@ -13,15 +13,13 @@ setuptools.setup(
     description='Plotting package for Backtrader (Bokeh)',
 
     python_requires='>=3.6',
-    
-    # Author details
+
     author='verybadsolider',
     author_email='vbs@springrts.de',
 
     long_description=long_description,
     long_description_content_type="text/markdown",
-    
-    # Choose your license
+
     license='GPLv3+',
 
     # What does your project relate to?
@@ -32,7 +30,7 @@ setuptools.setup(
     package_data={'backtrader_plotting.bokeh': ['templates/*.j2']},
 
     install_requires=[
-        'bokeh~=1.0.0',
+        'bokeh~=1.4.0',
         'jinja2',
         'backtrader',
         'pandas',

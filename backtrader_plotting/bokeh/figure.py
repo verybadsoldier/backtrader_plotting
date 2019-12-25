@@ -129,6 +129,16 @@ class Figure(object):
                 source=self._cds,
             ),
             code="""
+            // We override this axis' formatter's `doFormat` method
+            // with one that maps index ticks to dates. Some of those dates
+            // are undefined (e.g. those whose ticks fall out of defined data
+            // range) and we must filter out and account for those, otherwise
+            // the formatter computes invalid visible span and returns some
+            // labels as 'ERR'.
+            // Note, after this assignment statement, on next plot redrawing,
+            // our override `doFormat` will be called directly
+            // -- FunctionTickFormatter.doFormat(), i.e. _this_ code, no longer
+            // executes.  
                 axis.formatter.doFormat = function (ticks) {
                     const dates = ticks.map(i => source.data.datetime[i]),
                           valid = t => t !== undefined,
@@ -136,10 +146,12 @@ class Figure(object):
                     let i = 0;
                     return dates.map(t => valid(t) ? labels[i++] : '');
                 };
-                const axisticks = axis.tick_coords.major[0],
-                      labels = axis.formatter.doFormat(ticks);
-                return labels[axisticks.indexOf(tick)];
-        """)
+                
+                // we do this manually only for the first time we are called
+                const labels = axis.formatter.doFormat(ticks);
+                return labels[index];
+            """
+            )
 
         ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)
         f.tools.append(ch)
@@ -236,7 +248,7 @@ class Figure(object):
                 label = indlabel
                 if master is None or plotinfo.plotlinelabels:
                     label += " " + (lineplotinfo._get("_name", "") or linealias)
-            kwglyphs['legend'] = label
+            kwglyphs['legend_label'] = label
 
             if marker is not None:
                 kwglyphs['size'] = lineplotinfo.markersize * 1.2
@@ -394,7 +406,7 @@ class Figure(object):
 
             self._hoverc.add_hovertip("Close", f"@{source_id}close")
         elif self._scheme.style == 'bar':
-            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend=data._name)
+            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=data._name)
             renderer = self.figure.vbar('index',
                                         get_bar_width(),
                                         source_id + 'open',
@@ -439,7 +451,7 @@ class Figure(object):
         kwargs = {'fill_alpha': alpha,
                   'line_alpha': alpha,
                   'name': 'Volume',
-                  'legend': 'Volume'}
+                  'legend_label': 'Volume'}
 
         ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
 

@@ -221,13 +221,12 @@ class Bokeh(metaclass=bt.MetaParams):
             bf = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme)
             bf.plot_volume(v, strat_clk, 1.0, start, end)
 
-        # apply legend click policy
         for f in strat_figures:
             f.figure.legend.click_policy = self.p.scheme.legend_click
-
-        for f in strat_figures:
+            f.figure.legend.location = self.p.scheme.legend_location
             f.figure.legend.background_fill_color = self.p.scheme.legend_background_color
             f.figure.legend.label_text_color = self.p.scheme.legend_text_color
+            f.figure.legend.orientation = self.p.scheme.legend_orientation
 
         # link axis
         for i in range(1, len(strat_figures)):
@@ -269,7 +268,11 @@ class Bokeh(metaclass=bt.MetaParams):
 
         panels = []
         if len(figs) > 0:
-            chart_grid = gridplot([[x] for x in figs], toolbar_options={'logo': None})
+            chart_grid = gridplot([[x] for x in figs],
+                                  toolbar_options={'logo': None},
+                                  toolbar_location=self.p.scheme.toolbar_location,
+                                  sizing_mode=self.p.scheme.plot_sizing_mode,
+                                  )
             panels.append(Panel(child=chart_grid, title="Charts"))
 
         panel_analyzers = self._get_analyzer_tab(fp)
@@ -277,13 +280,12 @@ class Bokeh(metaclass=bt.MetaParams):
             panels.append(panel_analyzers)
 
         if len(panels) == 0:
-            panels.append(Bokeh._get_nodata_panel())
+            panels.append(self._get_nodata_panel())
 
         return Tabs(tabs=panels)
 
-    @staticmethod
-    def _get_nodata_panel():
-        chart_grid = gridplot([], toolbar_location='right', toolbar_options={'logo': None})
+    def _get_nodata_panel(self):
+        chart_grid = gridplot([], toolbar_location=self.p.scheme.toolbar_location, toolbar_options={'logo': None})
         return Panel(child=chart_grid, title="No Data")
 
     def _generate_model_tabs(self, fp: FigurePage):
@@ -297,7 +299,11 @@ class Bokeh(metaclass=bt.MetaParams):
         def add_panel(obj, title):
             if len(obj) == 0:
                 return
-            g = gridplot([[x.figure] for x in obj], toolbar_options={'logo': None}, toolbar_location='right')
+            g = gridplot([[x.figure] for x in obj],
+                         toolbar_options={'logo': None},
+                         toolbar_location=self.p.scheme.toolbar_location,
+                         sizing_mode=self.p.scheme.plot_sizing_mode,
+                         )
             panels.append(Panel(title=title, child=g))
 
         add_panel(datas, "Datas")
@@ -309,7 +315,7 @@ class Bokeh(metaclass=bt.MetaParams):
             panels.append(p_analyzers)
 
         if len(panels) == 0:
-            panels.append(Bokeh._get_nodata_panel())
+            panels.append(self._get_nodata_panel())
 
         return Tabs(tabs=panels)
     # endregion

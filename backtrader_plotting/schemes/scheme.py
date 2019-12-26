@@ -15,6 +15,8 @@ class Scheme(_BtPlotScheme):
 
         self.legend_background_color = '#3C3F41'
         self.legend_text_color = 'lightgrey'
+        self.legend_location = 'top_left'
+        self.legend_orientation = 'horizontal'
 
         self.loc = 'lightgray'
         self.background_fill = '#222222'
@@ -34,13 +36,15 @@ class Scheme(_BtPlotScheme):
         self.table_color_odd = '#333333'
         self.table_header_color = '#7a7a7a'
 
-        self.plot_width = 1800
         self.analyzer_tab_width = 1860
         self.analyzer_tab_num_cols = 2
-        self.plot_height_data = 800
         self.plot_height_indicator = 400
         self.plot_height_observer = 400
         self.plot_mode = "tabs"
+        self.plot_aspect_ratio = 3.0
+        self.plot_sizing_mode = "scale_width"
+
+        self.toolbar_location = "right"
 
         self.tooltip_background_color = '#4C4F51'
         self.tooltip_text_label_color = '#848EFF'

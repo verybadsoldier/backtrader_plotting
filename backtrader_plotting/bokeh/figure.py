@@ -86,7 +86,6 @@ class Figure(object):
         else:
             self._hover.renderers = [ren]
 
-
     def _nextcolor(self, key: object=None) -> None:
         self._coloridx[key] += 1
         return self._coloridx[key]
@@ -96,7 +95,7 @@ class Figure(object):
 
     def _init_figure(self):
         # plot height will be set later
-        f = figure(tools=Figure._tools, plot_width=self._scheme.plot_width, sizing_mode='scale_width', x_axis_type='linear')
+        f = figure(tools=Figure._tools, x_axis_type='linear', aspect_ratio=self._scheme.plot_aspect_ratio)
         # TODO: backend webgl (output_backend="webgl") removed due to this bug:
         # https://github.com/bokeh/bokeh/issues/7568
 
@@ -168,21 +167,14 @@ class Figure(object):
     def plot(self, obj, strat_clk, master=None):
         if isinstance(obj, bt.AbstractDataBase):
             self.plot_data(obj, master, strat_clk)
-            height_set = self._scheme.plot_height_data
         elif isinstance(obj, bt.indicator.Indicator):
             self.plot_indicator(obj, master, strat_clk)
-            height_set = self._scheme.plot_height_indicator
         elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj, master)
-            height_set = self._scheme.plot_height_observer
         else:
             raise Exception(f"Unsupported plot object: {type(obj)}")
 
         self.datas.append(obj)
-
-        # set height according to master type
-        if master is None:
-            self.figure.plot_height = height_set
 
     @staticmethod
     def _get_datas_description(ind: bt.Indicator) -> str:
@@ -368,7 +360,7 @@ class Figure(object):
 
     def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
         source_id = Figure._source_id(data)
-        title = sanitize_source_name(data._name or '<NoName>')
+        title = sanitize_source_name(data)
         if len(data._env.strats) > 1:
             title += f" ({get_strategy_label(type(self._strategy), self._strategy.params)})"
 
@@ -401,12 +393,12 @@ class Figure(object):
                 self._nextcolor(data.plotinfo.plotmaster)
                 color = convert_color(self._color(data.plotinfo.plotmaster))
 
-            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=data._name)
+            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=title)
             self._set_single_hover_renderer(renderer)
 
             self._hoverc.add_hovertip("Close", f"@{source_id}close")
         elif self._scheme.style == 'bar':
-            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=data._name)
+            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
             renderer = self.figure.vbar('index',
                                         get_bar_width(),
                                         source_id + 'open',

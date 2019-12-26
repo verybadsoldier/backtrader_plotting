@@ -2,6 +2,7 @@ from array import array
 import bisect
 import datetime
 import inspect
+import itertools
 import logging
 import os
 import sys
@@ -85,40 +86,25 @@ class Bokeh(metaclass=bt.MetaParams):
             if self.p.scheme.volume and self.p.scheme.voloverlay is False:
                 self._volume_graphs.append(d)
 
-        # Sort observers in the different lists/dictionaries
-        for o in obs:
-            if not o.plotinfo.plot or o.plotinfo.plotskip:
-                continue
-
-            if o.plotinfo.subplot:
-                self._data_graph[o] = []
-            else:
-                pmaster = Bokeh._resolve_plotmaster(o.plotinfo.plotmaster or o.data)
-                if pmaster not in self._data_graph:
-                    self._data_graph[pmaster] = []
-                self._data_graph[pmaster].append(o)
-
-        for ind in inds:
-            if not hasattr(ind, 'plotinfo'):
+        for obj in itertools.chain(inds, obs):
+            if not hasattr(obj, 'plotinfo'):
                 # no plotting support - so far LineSingle derived classes
                 continue
 
             # should this indicator be plotted?
-            if not ind.plotinfo.plot or ind.plotinfo.plotskip:
+            if not obj.plotinfo.plot or obj.plotinfo.plotskip:
                 continue
 
             # subplot = create a new figure for this indicator
-            subplot = ind.plotinfo.subplot
-            if subplot:
-                self._data_graph[ind] = []
+            subplot: bool = obj.plotinfo.subplot
+            plotmaster: str = obj.plotinfo.plotmaster
+            if subplot and plotmaster is None:
+                self._data_graph[obj] = []
             else:
-                pm = ind.plotinfo.plotmaster if ind.plotinfo.plotmaster is not None else ind.data
-                pm = get_data_obj(pm)
-                pmaster = Bokeh._resolve_plotmaster(pm)
-                if pmaster not in self._data_graph:
-                    self._data_graph[pmaster] = []
-                self._data_graph[pmaster].append(ind)
-
+                plotmaster = plotmaster if plotmaster is not None else obj.data
+                if plotmaster not in self._data_graph:
+                    self._data_graph[plotmaster] = []
+                self._data_graph[plotmaster].append(obj)
     @property
     def figures(self):
         return self._fp.figures

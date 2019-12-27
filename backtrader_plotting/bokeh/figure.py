@@ -4,7 +4,7 @@ from array import array
 
 import backtrader as bt
 
-from backtrader_plotting.utils import get_strategy_label, get_data_obj
+from backtrader_plotting.utils import get_data_obj
 from .utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
@@ -14,6 +14,7 @@ from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
+from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.utils import resample_line
 
 
@@ -174,30 +175,19 @@ class Figure(object):
         else:
             raise Exception(f"Unsupported plot object: {type(obj)}")
 
-        self.datas.append(obj)
+        # first object can apply aspect ratio
+        if len(self.datas) == 0:
+            aspectr = getattr(obj.plotinfo, 'plotaspectratio', None)
+            if aspectr is not None:
+                self.figure.aspect_ratio = aspectr
 
-    @staticmethod
-    def _get_datas_description(ind: bt.Indicator) -> str:
-        """Returns a string listing all involved data feeds. Empty string if there is only a single feed in the mix"""
-        names = []
-        for x in ind.datas:
-            if isinstance(x, bt.AbstractDataBase):
-                # for pandas feed _dataname is a DataFrame
-                # names.append(x._dataname)
-                names.append(x._name)
-            elif isinstance(x, bt.Indicator):
-                names.append(x.plotlabel())
-        return f"({','.join(names)})"
+        self.datas.append(obj)
 
     def plot_observer(self, obj, master):
         self.plot_indicator(obj, master)
 
     def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array=None):
-        pl = obj.plotlabel()
-        if isinstance(obj, bt.Indicator):
-            pl += Figure._get_datas_description(obj)
-        elif isinstance(obj, bt.Observer):
-            pl += get_strategy_label(type(obj._owner), obj._owner.params)
+        pl = plotobj2label(obj)
 
         self._figure_append_title(pl)
         indlabel = obj.plotlabel()
@@ -346,7 +336,7 @@ class Figure(object):
     def _figure_append_title(self, title):
         # append to title
         if len(self.figure.title.text) > 0:
-            self.figure.title.text += " / "
+            self.figure.title.text += " | "
         self.figure.title.text += title
 
     def _add_to_cds(self, data, name):

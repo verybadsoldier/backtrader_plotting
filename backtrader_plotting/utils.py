@@ -6,6 +6,7 @@ from typing import Dict, Optional, List, Union
 import backtrader as bt
 
 import pandas
+import itertools
 
 
 _logger = logging.getLogger(__name__)
@@ -33,12 +34,6 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     plabs = [f"{x}: {get_value_str(x, y)}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
     return plabs
-
-
-def get_strategy_label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoClass]) -> str:
-    label = strategycls.__name__
-    plabs = get_params_str(params)
-    return f'{label} [{plabs}]'
 
 
 def nanfilt(x: List) -> List:
@@ -90,3 +85,19 @@ def get_data_obj(obj):
         return obj._owner
     else:
         return obj
+
+
+def find_by_plotid(strategy: bt.Strategy, plotid):
+    objs = itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers())
+    founds = []
+    for obj in objs:
+        if getattr(obj.plotinfo, 'ploftid', None) == plotid:
+            founds.append(obj)
+
+    num_results = len(founds)
+    if num_results == 0:
+        return None
+    elif num_results == 1:
+        return founds[0]
+    else:
+        raise RuntimeError(f'Found multiple objects with plotid "{plotid}"')

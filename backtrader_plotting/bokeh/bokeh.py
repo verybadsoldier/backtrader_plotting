@@ -4,6 +4,7 @@ import datetime
 import inspect
 import itertools
 import logging
+import re
 import os
 import sys
 import tempfile
@@ -26,12 +27,13 @@ from bokeh.util.browser import view
 
 from jinja2 import Environment, PackageLoader
 
-from .utils import generate_stylesheet
-from .. import bttypes
-from .figure import Figure, HoverContainer
-from .datatable import TableGenerator
-from ..schemes import Blackly
-from ..schemes.scheme import Scheme
+from backtrader_plotting.bokeh.utils import generate_stylesheet
+from backtrader_plotting.utils import find_by_plotid
+from backtrader_plotting import bttypes
+from backtrader_plotting.bokeh.figure import Figure, HoverContainer
+from backtrader_plotting.bokeh.datatable import TableGenerator
+from backtrader_plotting.schemes import Blackly
+from backtrader_plotting.schemes.scheme import Scheme
 
 _logger = logging.getLogger(__name__)
 
@@ -52,7 +54,9 @@ class FigurePage(object):
 
 class Bokeh(metaclass=bt.MetaParams):
     params = (('scheme', Blackly()),
-              ('filename', None))
+              ('filename', None),
+              ('plotconfig', None),
+              )
 
     def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
@@ -67,6 +71,58 @@ class Bokeh(metaclass=bt.MetaParams):
             raise Exception("Provided scheme has to be a subclass of backtrader_plotting.schemes.scheme.Scheme")
 
         self._fp = FigurePage()
+
+    def _configure_plotting(self, strategy: bt.Strategy):
+        datas, inds, obs = strategy.datas, strategy.getindicators(), strategy.getobservers()
+
+        for objs in [datas, inds, obs]:
+            for idx, obj in enumerate(objs):
+                self._configure_plotobject(obj, idx, strategy)
+
+    def _configure_plotobject(self, obj, idx, strategy):
+        if self.p.plotconfig is None:
+            return
+
+        def apply_config(obj, config):
+            for k, v in config.items():
+                if k == 'plotmaster':
+                    # this needs special treatment since a string is passed but we need to set the actual obj
+                    v = find_by_plotid(strategy, v)
+
+                setattr(obj.plotinfo, k, v)
+
+        for k, config in self.p.plotconfig.items():
+            ctype, target = k.split(':', 2)
+
+            if ctype == 'r':  # regex
+                label = Figure.plotobj2label(obj)
+
+                m = re.match(target, label)
+                if m:
+                    apply_config(obj, config)
+            elif ctype[0] == '#':  # index
+                target_type, target_idx = target.split('-')
+
+                target_types = {
+                    'i': bt.Indicator,
+                    'o': bt.Observer,
+                    'd': bt.AbstractDataBase,
+                }
+
+                # check if instance type matches
+                if not isinstance(obj, target_types[target_type]):
+                    continue
+
+                if int(target_idx) != idx:
+                    continue
+                apply_config(obj, config)
+            elif ctype == 'id':  # plotid
+                plotid = getattr(obj.plotinfo, 'plotid', None)
+                if plotid is None or plotid != target:
+                    continue
+                apply_config(obj, config)
+            else:
+                raise RuntimeError(f'Unknown config type in plotting config: {k}')
 
     def _build_graph(self, datas, inds, obs):
         self._data_graph = {}
@@ -209,17 +265,17 @@ class Bokeh(metaclass=bt.MetaParams):
 
         for master, slaves in self._data_graph.items():
             plotabove = getattr(master.plotinfo, 'plotabove', False)
-            bf = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme, type(master), plotabove)
-            strat_figures.append(bf)
+            figure = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme, type(master), plotabove)
+            strat_figures.append(figure)
 
-            bf.plot(master, strat_clk, None)
+            figure.plot(master, strat_clk, None)
 
             for s in slaves:
-                bf.plot(s, strat_clk, master)
+                figure.plot(s, strat_clk, master)
 
         for v in self._volume_graphs:
-            bf = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme)
-            bf.plot_volume(v, strat_clk, 1.0, start, end)
+            figure = Figure(strategy, self._fp.cds, hoverc, start, end, self.p.scheme)
+            figure.plot_volume(v, strat_clk, 1.0, start, end)
 
         for f in strat_figures:
             f.figure.legend.click_policy = self.p.scheme.legend_click
@@ -385,6 +441,8 @@ class Bokeh(metaclass=bt.MetaParams):
             raise Exception("Different backends by 'use' not supported")
 
         self._iplot = iplot and 'ipykernel' in sys.modules
+
+        self._configure_plotting(obj)
 
         if isinstance(obj, bt.Strategy):
             self._blueprint_strategy(obj, start, end, **kwargs)

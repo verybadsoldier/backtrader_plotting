@@ -156,7 +156,7 @@ class Figure(object):
         ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)
         f.tools.append(ch)
 
-        h = HoverTool(tooltips=[('Time', '@datetime{%x %X}')],
+        h = HoverTool(tooltips=[('Time', f'@datetime{{{self._scheme.hovertool_timeformat}}}')],
                       mode="vline",
                       formatters={'datetime': 'datetime'}
                       )

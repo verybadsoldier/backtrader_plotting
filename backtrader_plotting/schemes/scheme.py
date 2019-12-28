@@ -55,6 +55,9 @@ class Scheme(_BtPlotScheme):
 
         self.show_headline = True
 
+        self.hovertool_timeformat = '%F %R'
+        # https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html#bokeh.models.formatters.DatetimeTickFormatter
+
         """
         hover tooltips of datas will contain all other datas and all indicators/observers
         if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data

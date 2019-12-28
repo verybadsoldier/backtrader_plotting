@@ -20,7 +20,7 @@ class Scheme(_BtPlotScheme):
 
         self.loc = 'lightgray'
         self.background_fill = '#222222'
-        self.body_fill = "white"
+        self.body_background_color = "white"
         self.border_fill = "#3C3F41"
         self.legend_click = "hide"  # or "mute"
         self.axis_line_color = 'darkgrey'
@@ -29,6 +29,7 @@ class Scheme(_BtPlotScheme):
         self.axis_text_color = 'lightgrey'
         self.plot_title_text_color = 'darkgrey'
         self.axis_label_text_color = 'darkgrey'
+        self.tag_pre_background_color = 'lightgrey'
 
         self.xaxis_pos = "all"  # "all" or "bottom"
 

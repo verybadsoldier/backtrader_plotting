@@ -4,6 +4,41 @@
         color: {{text_color}};
     }
 
+    table.metaDataTable {
+      border: 1px solid #1C6EA4;
+      background-color: #EEEEEE;
+      width: 100%;
+      text-align: left;
+      border-collapse: collapse;
+    }
+    table.metaDataTable td, table.metaDataTable th {
+      border: 1px solid #AAAAAA;
+      padding: 3px 2px;
+    }
+    table.metaDataTable tbody td {
+      font-size: 13px;
+    }
+    table.metaDataTable tr:nth-child(even) {
+      background: #D0E4F5;
+    }
+    table.metaDataTable tfoot td {
+      font-size: 14px;
+    }
+    table.metaDataTable tfoot .links {
+      text-align: right;
+    }
+    table.metaDataTable tfoot .links a{
+      display: inline-block;
+      background: #1C6EA4;
+      color: #FFFFFF;
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+
+    pre {
+        background-color: {{tag_pre_background_color}};
+    }
+
     #headline {
         font-size: 200%;
         font-family: "Segoe UI", "Arial Black", Gadget, sans-serif;

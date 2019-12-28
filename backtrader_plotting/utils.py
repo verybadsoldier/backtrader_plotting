@@ -12,26 +12,34 @@ import itertools
 _logger = logging.getLogger(__name__)
 
 
+def paramval2str(name, value):
+    if value is None:
+        return 'None'
+    elif name == "timeframe":
+        return bt.TimeFrame.getname(value, 1)
+    elif isinstance(value, str):
+        return value
+    elif isinstance(value, int):
+        return str(value)
+    elif isinstance(value, list):
+        return ','.join(value)
+    elif isinstance(value, type):
+        return value.__name__
+    else:
+        return f"{value:.2f}"
+
+
 def get_nondefault_params(params: object) -> Dict[str, object]:
     return {key: params._get(key) for key in params._getkeys() if not params.isdefault(key)}
 
 
+def get_params(params: bt.AutoInfoClass):
+    return {key: params._get(key) for key in params._getkeys()}
+
+
 def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     user_params = get_nondefault_params(params)
-
-    def get_value_str(name, value):
-        if name == "timeframe":
-            return bt.TimeFrame.getname(value, 1)
-        elif isinstance(value, str):
-            return value
-        elif isinstance(value, int):
-            return str(value)
-        elif isinstance(value, list):
-            return ','.join(value)
-        else:
-            return f"{value:.2f}"
-
-    plabs = [f"{x}: {get_value_str(x, y)}" for x, y in user_params.items()]
+    plabs = [f"{x}: {paramval2str(x, y)}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
     return plabs
 

@@ -24,7 +24,7 @@ class Tradimo(Blackly):
 
         self.loc = '#265371'
         self.background_fill = 'white'
-        self.body_fill = "white"
+        self.body_background_color = "white"
         self.border_fill = "white"
         self.axis_line_color = '#222222'
         self.grid_line_color = '#eeeeee'

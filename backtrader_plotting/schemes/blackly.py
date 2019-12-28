@@ -11,7 +11,7 @@ class Blackly(Scheme):
         self.legend_text_color = 'lightgrey'
 
         self.background_fill = '#222222'
-        self.body_fill = "#2B2B2B"
+        self.body_background_color = "#2B2B2B"
         self.border_fill = "#3C3F41"
         self.legend_click = "hide"  # or "mute"
         self.axis_line_color = 'darkgrey'

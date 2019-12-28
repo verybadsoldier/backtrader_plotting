@@ -14,7 +14,7 @@ from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
-from backtrader_plotting.bokeh.label_resolver import plotobj2label
+from backtrader_plotting.bokeh.label_resolver import plotobj2label, strategy2label
 from backtrader_plotting.utils import resample_line
 
 
@@ -357,7 +357,7 @@ class Figure(object):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(data)
         if len(data._env.strats) > 1:
-            title += f" ({get_strategy_label(type(self._strategy), self._strategy.params)})"
+            title += f" ({strategy2label(type(self._strategy), self._strategy.params)})"
 
         # append to title
         self._figure_append_title(title)

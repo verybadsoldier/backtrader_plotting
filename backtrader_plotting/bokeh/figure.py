@@ -124,8 +124,13 @@ class Figure(object):
         f.xaxis.formatter = FuncTickFormatter(
             args=dict(
                 axis=f.xaxis[0],
-                formatter=DatetimeTickFormatter(days=['%d %b', '%a %d'],
-                                                months=['%m/%Y', "%b %y"]),
+                formatter=DatetimeTickFormatter(minutes=[self._scheme.axis_tickformat_minutes],
+                                                hourmin=[self._scheme.axis_tickformat_hourmin],
+                                                hours=[self._scheme.axis_tickformat_hours],
+                                                days=[self._scheme.axis_tickformat_days],
+                                                months=[self._scheme.axis_tickformat_months],
+                                                years=[self._scheme.axis_tickformat_years],
+                                                ),
                 source=self._cds,
             ),
             code="""

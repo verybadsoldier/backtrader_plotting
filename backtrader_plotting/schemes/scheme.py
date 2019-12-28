@@ -55,8 +55,8 @@ class Scheme(_BtPlotScheme):
 
         self.show_headline = True
 
-        self.hovertool_timeformat = '%F %R'
         # https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html#bokeh.models.formatters.DatetimeTickFormatter
+        self.hovertool_timeformat = '%F %R'
 
         """
         hover tooltips of datas will contain all other datas and all indicators/observers
@@ -66,3 +66,12 @@ class Scheme(_BtPlotScheme):
 
         self.number_format = '0,0.000'
         self.number_format_volume = '0.00 a'
+
+        # https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html
+        self.axis_tickformat_minutes = ":%M"
+        self.axis_tickformat_hourmin = "%H:%M"
+        self.axis_tickformat_hours = "%d %b %R"
+
+        self.axis_tickformat_days = "%d %b %R"
+        self.axis_tickformat_months = "%m/%Y"
+        self.axis_tickformat_years = "%Y %b"

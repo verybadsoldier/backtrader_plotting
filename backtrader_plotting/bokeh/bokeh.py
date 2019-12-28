@@ -391,7 +391,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
             analyzers.append(column([table_header] + elements))
 
-        childs = gridplot(analyzers, ncols=self.p.scheme.analyzer_tab_num_cols)
+        childs = gridplot(analyzers, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None})
         return Panel(child=childs, title="Analyzers")
 
     def _output_stylesheet(self, template="basic.css.j2"):

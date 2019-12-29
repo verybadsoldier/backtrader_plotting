@@ -1,12 +1,8 @@
-from typing import Union
-import collections
 from array import array
+import collections
+from typing import Union
 
 import backtrader as bt
-
-from backtrader_plotting.utils import get_data_obj
-from .utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
-from backtrader_plotting.utils import convert_to_pandas, nanfilt
 
 from bokeh.models import Span
 from bokeh.plotting import figure
@@ -14,8 +10,10 @@ from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
+
 from backtrader_plotting.bokeh.label_resolver import plotobj2label, strategy2label
-from backtrader_plotting.utils import resample_line
+from backtrader_plotting.utils import resample_line, convert_to_pandas, nanfilt, get_data_obj
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 
 
 class HoverContainer(object):
@@ -68,6 +66,7 @@ class Figure(object):
         self.plotabove = plotabove
         self.datas = []  # list of all datas that have been plotted to this figure
         self._init_figure()
+        self.plottab = None
 
     def _set_single_hover_renderer(self, ren: Renderer):
         """Sets this figure's hover to a single renderer"""
@@ -180,11 +179,15 @@ class Figure(object):
         else:
             raise Exception(f"Unsupported plot object: {type(obj)}")
 
-        # first object can apply aspect ratio
+        # first object can apply config
         if len(self.datas) == 0:
             aspectr = getattr(obj.plotinfo, 'plotaspectratio', None)
             if aspectr is not None:
                 self.figure.aspect_ratio = aspectr
+
+            tab = getattr(obj.plotinfo, 'plottab', None)
+            if tab is not None:
+                self.plottab = tab
 
         self.datas.append(obj)
 

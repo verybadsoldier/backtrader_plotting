@@ -359,25 +359,35 @@ class Bokeh(metaclass=bt.MetaParams):
         return Panel(child=chart_grid, title="No Data")
 
     def _generate_model_panels(self, fp: FigurePage) -> List[Panel]:
-        figs = list(fp.figures)
-        observers = [x for x in figs if isinstance(x.master, bt.Observer)]
-        datas = [x for x in figs if isinstance(x.master, bt.DataBase)]
-        inds = [x for x in figs if isinstance(x.master, bt.Indicator)]
+        observers = [x for x in fp.figures if isinstance(x.master, bt.Observer)]
+        datas = [x for x in fp.figures if isinstance(x.master, bt.DataBase)]
+        inds = [x for x in fp.figures if isinstance(x.master, bt.Indicator)]
 
         panels = []
 
-        def add_panel(obj, title):
-            if len(obj) == 0:
+        def build_panel(objects, panel_title):
+            if len(objects) == 0:
                 return
-            g = gridplot([[x.figure] for x in obj],
+            g = gridplot([[x.figure] for x in objects],
                          toolbar_options={'logo': None},
                          toolbar_location=self.p.scheme.toolbar_location,
                          sizing_mode=self.p.scheme.plot_sizing_mode,
                          )
-            panels.append(Panel(title=title, child=g))
+            panels.append(Panel(title=panel_title, child=g))
 
-        add_panel(datas, "Datas")
-        add_panel(inds, "Indicators")
+        # now assign figures to tabs
+        # 1. assign default tabs if no manual tab is assigned
+        for figure in [x for x in datas if x.plottab is None]:
+            figure.plottab = 'Datas'
+
+        for figure in [x for x in inds if x.plottab is None]:
+            figure.plottab = 'Indicators'
+
+        # 2. group panels by desired tabs
+        tabgroups = itertools.groupby(itertools.chain(datas, inds), lambda x: x.plottab)
+
+        for tabname, figures in tabgroups:
+            build_panel(list(figures), tabname)
 
         # group observers by associated strategy
         for strategy in self._cerebro.runningstrats:
@@ -389,7 +399,7 @@ class Bokeh(metaclass=bt.MetaParams):
             else:
                 title_suffix = ''
 
-            add_panel(strat_observers, "Observers" + title_suffix)
+            build_panel(strat_observers, "Observers" + title_suffix)
 
         return panels
     # endregion

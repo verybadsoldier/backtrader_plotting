@@ -53,7 +53,7 @@ class HoverContainer(object):
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master_type, plotabove: bool):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotabove: bool):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._hoverc = hoverc
@@ -64,7 +64,7 @@ class Figure(object):
         self._hover: HoverTool = None
         self._coloridx = collections.defaultdict(lambda: -1)
         self._hover_line_set = False
-        self.master_type = master_type
+        self.master = master
         self.plotabove = plotabove
         self.datas = []  # list of all datas that have been plotted to this figure
         self._init_figure()

@@ -28,6 +28,7 @@ from bokeh.util.browser import view
 from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet
+from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.utils import find_by_plotid
 from backtrader_plotting import bttypes
 from backtrader_plotting.bokeh.figure import Figure, HoverContainer
@@ -230,7 +231,7 @@ class Bokeh(metaclass=bt.MetaParams):
             return
 
         strat_figures = []
-        self._figurepage.analyzers = [a for _, a in strategy.analyzers.getitems()]
+        self._figurepage.analyzers += [a for _, a in strategy.analyzers.getitems()]
 
         st_dtime = strategy.lines.datetime.plot()
         if start is None:
@@ -268,7 +269,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
         for master, slaves in self._data_graph.items():
             plotabove = getattr(master.plotinfo, 'plotabove', False)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, type(master), plotabove)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, master, plotabove)
             strat_figures.append(figure)
 
             figure.plot(master, strat_clk, None)
@@ -310,22 +311,33 @@ class Bokeh(metaclass=bt.MetaParams):
     def generate_model(self) -> Model:
         """Returns a model generated from internal blueprints"""
         if self.p.scheme.plot_mode == 'single':
-            tabs = self._generate_model_single(self._figurepage)
+            panels = self._generate_model_single(self._figurepage)
         elif self.p.scheme.plot_mode == 'tabs':
-            tabs = self._generate_model_panels(self._figurepage)
+            panels = self._generate_model_panels(self._figurepage)
         else:
             raise Exception(f"Unsupported plot mode: {self.p.scheme.plot_mode}")
 
+        # now append analyzer tab(s)
+        for strategy in self._cerebro.runningstrats:
+            strat_analyzers = [x for x in self._figurepage.analyzers if x.strategy is strategy]
+
+            analyzer_name_suffix = None
+            if len(self._cerebro.runningstrats) > 1:
+                analyzer_name_suffix = label_resolver.strategy2shortname(strategy)
+            panel_analyzer = self._get_analyzer_panel(strat_analyzers, analyzer_name_suffix)
+            if panel_analyzer is not None:
+                panels.append(panel_analyzer)
+
         meta = Div(text=metadata.get_metadata_div(self._cerebro))
         metapanel = Panel(child=meta, title="Meta")
-        tabs.tabs.append(metapanel)
+        panels.append(metapanel)
 
-        return tabs
+        return Tabs(tabs=panels)
 
-    def _generate_model_single(self, fp: FigurePage) -> Tabs:
+    def _generate_model_single(self, fp: FigurePage) -> List[Panel]:
         """Print all figures in one column. Plot observers first, then all plotabove then rest"""
         figs = list(fp.figures)
-        observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
+        observers = [x for x in figs if isinstance(x.master, bt.Observer)]
         figs = [x for x in figs if x not in observers]
         aboves = [x for x in figs if x.plotabove]
         figs = [x for x in figs if x not in aboves]
@@ -340,14 +352,7 @@ class Bokeh(metaclass=bt.MetaParams):
                                   )
             panels.append(Panel(child=chart_grid, title="Charts"))
 
-        panel_analyzer = self._get_analyzer_panel(fp)
-        if panel_analyzer is not None:
-            panels.append(panel_analyzer)
-
-        if len(panels) == 0:
-            panels.append(self._get_nodata_panel())
-
-        return Tabs(tabs=panels)
+        return panels
 
     def _get_nodata_panel(self):
         chart_grid = gridplot([], toolbar_location=self.p.scheme.toolbar_location, toolbar_options={'logo': None})
@@ -355,9 +360,9 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def _generate_model_panels(self, fp: FigurePage) -> List[Panel]:
         figs = list(fp.figures)
-        observers = [x for x in figs if issubclass(x.master_type, bt.Observer)]
-        datas = [x for x in figs if issubclass(x.master_type, bt.DataBase)]
-        inds = [x for x in figs if issubclass(x.master_type, bt.Indicator)]
+        observers = [x for x in figs if isinstance(x.master, bt.Observer)]
+        datas = [x for x in figs if isinstance(x.master, bt.DataBase)]
+        inds = [x for x in figs if isinstance(x.master, bt.Indicator)]
 
         panels = []
 
@@ -373,35 +378,42 @@ class Bokeh(metaclass=bt.MetaParams):
 
         add_panel(datas, "Datas")
         add_panel(inds, "Indicators")
-        add_panel(observers, "Observers")
 
-        p_analyzers = self._get_analyzer_tab(fp)
-        if p_analyzers is not None:
-            panels.append(p_analyzers)
+        # group observers by associated strategy
+        for strategy in self._cerebro.runningstrats:
+            strat_observers = [x for x in observers if x.master._owner is strategy]
 
-        if len(panels) == 0:
-            panels.append(self._get_nodata_panel())
+            if len(self._cerebro.runningstrats) > 1:
+                # add a a strategy suffix if we show multiple tabs
+                title_suffix = f' - {label_resolver.strategy2shortname(strategy)}'
+            else:
+                title_suffix = ''
+
+            add_panel(strat_observers, "Observers" + title_suffix)
 
         return panels
     # endregion
 
-    def _get_analyzer_panel(self, figpage: FigurePage) -> Optional[Panel]:
+    def _get_analyzer_panel(self, analyzers: List[bt.Analyzer], name_suffix=None) -> Optional[Panel]:
         def _get_column_row_count(col) -> int:
             return sum([x.height for x in col if x.height is not None])
 
-        if len(figpage.analyzers) == 0:
+        if len(analyzers) == 0:
             return None
 
         table_width = int(self.p.scheme.analyzer_tab_width / self.p.scheme.analyzer_tab_num_cols)
-        analyzers = []
 
-        for analyzer in figpage.analyzers:
+        acolumns = []
+        for analyzer in analyzers:
             table_header, elements = self._tablegen.get_analyzers_tables(analyzer, table_width)
 
-            analyzers.append(column([table_header] + elements))
+            acolumns.append(column([table_header] + elements))
 
-        childs = gridplot(analyzers, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None})
-        return Panel(child=childs, title="Analyzers")
+        childs = gridplot(acolumns, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None})
+        name = "Analyzers"
+        if name_suffix is not None:
+            name += f" - {name_suffix}"
+        return Panel(child=childs, title=name)
 
     def _output_stylesheet(self, template="basic.css.j2"):
         return generate_stylesheet(self.p.scheme, template)
@@ -453,7 +465,7 @@ class Bokeh(metaclass=bt.MetaParams):
             self._blueprint_strategy(obj, start, end, **kwargs)
         elif isinstance(obj, bt.OptReturn):
             # for optresults we only plot analyzers!
-            self._figurepage.analyzers = [a for _, a in obj.analyzers.getitems()]
+            self._figurepage.analyzers += [a for _, a in obj.analyzers.getitems()]
         else:
             raise Exception(f'Unsupported plot source object: {str(type(obj))}')
         return [self._figurepage]

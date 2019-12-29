@@ -48,6 +48,10 @@ def _observer2label(obs: bt.Observer):
     return obs.plotlabel()
 
 
+def strategy2shortname(strategy: bt.Strategy) -> str:
+    return strategy.plotinfo.plotname or strategy.__class__.__name__
+
+
 def _indicator2fullid(ind: bt.Indicator) -> str:
     """Returns a string listing allZ involved data feeds. Empty string if there is only a single feed in the mix"""
     names = []

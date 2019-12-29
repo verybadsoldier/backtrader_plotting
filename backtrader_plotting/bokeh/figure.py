@@ -1,6 +1,6 @@
 from array import array
 import collections
-from typing import Union
+from typing import List, Union
 
 import backtrader as bt
 
@@ -11,6 +11,7 @@ from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 
+from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label, strategy2label
 from backtrader_plotting.utils import resample_line, convert_to_pandas, nanfilt, get_data_obj
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
@@ -30,7 +31,7 @@ class HoverContainer(object):
         """adds a hovertip for a target data"""
         self._hover_tooltips_data[target_data].append((label, tmpl))
 
-    def apply_hovertips(self, figures) -> None:
+    def apply_hovertips(self, figures: List['Figure']) -> None:
         """Add hovers to to all figures from the figures list"""
         for f in figures:
             for t in f.figure.tools:
@@ -51,7 +52,7 @@ class HoverContainer(object):
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotabove: bool):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, multistrat: bool):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._hoverc = hoverc
@@ -63,10 +64,11 @@ class Figure(object):
         self._coloridx = collections.defaultdict(lambda: -1)
         self._hover_line_set = False
         self.master = master
-        self.plotabove = plotabove
-        self.datas = []  # list of all datas that have been plotted to this figure
-        self._init_figure()
         self.plottab = None
+        self.plotorder = plotorder
+        self.datas = []  # list of all datas that have been plotted to this figure
+        self._multistrat: bool = multistrat
+        self._init_figure()
 
     def _set_single_hover_renderer(self, ren: Renderer):
         """Sets this figure's hover to a single renderer"""
@@ -189,16 +191,138 @@ class Figure(object):
             if tab is not None:
                 self.plottab = tab
 
+            order = getattr(obj.plotinfo, 'plotorder', None)
+            if order is not None:
+                self.plotorder = order
+
         self.datas.append(obj)
 
-    def plot_observer(self, obj, master):
-        self.plot_indicator(obj, master)
 
-    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array=None):
+    def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
+        source_id = Figure._source_id(data)
+        title = sanitize_source_name(label_resolver.datafeed_target(data))
+        if len(data._env.strats) > 1:
+            title += f" ({strategy2label(type(self._strategy), self._strategy.params)})"
+
+        # append to title
+        self._figure_append_title(title)
+
+        df = convert_to_pandas(strat_clk, data, self._start, self._end)
+
+        # configure colors
+        colorup = convert_color(self._scheme.barup)
+        colordown = convert_color(self._scheme.bardown)
+        colorup_wick = convert_color(self._scheme.barup_wick)
+        colordown_wick = convert_color(self._scheme.bardown_wick)
+        colorup_outline = convert_color(self._scheme.barup_outline)
+        colordown_outline = convert_color(self._scheme.bardown_outline)
+        is_up = df.close > df.open
+
+        self._add_to_cds(df.open, source_id + 'open')
+        self._add_to_cds(df.high, source_id + 'high')
+        self._add_to_cds(df.low, source_id + 'low')
+        self._add_to_cds(df.close, source_id + 'close')
+        self._add_to_cds([colorup if x else colordown for x in is_up], source_id + 'colors_bars')
+        self._add_to_cds([colorup_wick if x else colordown_wick for x in is_up], source_id + 'colors_wicks')
+        self._add_to_cds([colorup_outline if x else colordown_outline for x in is_up], source_id + 'colors_outline')
+
+        if self._scheme.style == 'line':
+            if data.plotinfo.plotmaster is None:
+                color = convert_color(self._scheme.loc)
+            else:
+                self._nextcolor(data.plotinfo.plotmaster)
+                color = convert_color(self._color(data.plotinfo.plotmaster))
+
+            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=title)
+            self._set_single_hover_renderer(renderer)
+
+            self._hoverc.add_hovertip("Close", f"@{source_id}close")
+        elif self._scheme.style == 'bar':
+            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
+            renderer = self.figure.vbar('index',
+                                        get_bar_width(),
+                                        source_id + 'open',
+                                        source_id + 'close',
+                                        source=self._cds,
+                                        fill_color=source_id + 'colors_bars',
+                                        line_color=source_id + 'colors_outline')
+
+            self._set_single_hover_renderer(renderer)
+
+            hover_target = None if self._scheme.merge_data_hovers else self.figure
+            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
+        else:
+            raise Exception(f"Unsupported style '{self._scheme.style}'")
+
+        adapt_yranges(self.figure.y_range, df.low, df.high)
+
+        # check if we have to plot volume overlay
+        if self._scheme.volume and self._scheme.voloverlay:
+            self.plot_volume(data, strat_clk, self._scheme.voltrans, True)
+
+    def plot_volume(self, data: bt.AbstractDataBase, strat_clk: array, alpha, extra_axis=False):
+        """extra_axis displays a second axis (for overlay on data plotting)"""
+        source_id = Figure._source_id(data)
+
+        df = convert_to_pandas(strat_clk, data, self._start, self._end)
+
+        if len(nanfilt(df.volume)) == 0:
+            return
+
+        colorup = convert_color(self._scheme.volup)
+        colordown = convert_color(self._scheme.voldown)
+
+        is_up = df.close > df.open
+        colors = [colorup if x else colordown for x in is_up]
+
+        self._add_to_cds(df.volume, f'{source_id}volume')
+        self._add_to_cds(colors, f'{source_id}volume_colors')
+
+        kwargs = {'fill_alpha': alpha,
+                  'line_alpha': alpha,
+                  'name': 'Volume',
+                  'legend_label': 'Volume'}
+
+        ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
+
+        if extra_axis:
+            self.figure.extra_y_ranges = {'axvol': DataRange1d()}
+            adapt_yranges(self.figure.extra_y_ranges['axvol'], df.volume)
+            self.figure.extra_y_ranges['axvol'].end /= self._scheme.volscaling
+
+            ax_color = colorup
+
+            ax = LinearAxis(y_range_name="axvol", formatter=ax_formatter,
+                            axis_label_text_color=ax_color, axis_line_color=ax_color, major_label_text_color=ax_color,
+                            major_tick_line_color=ax_color, minor_tick_line_color=ax_color)
+            self.figure.add_layout(ax, 'left')
+            kwargs['y_range_name'] = "axvol"
+        else:
+            self.figure.yaxis.formatter = ax_formatter
+            adapt_yranges(self.figure.y_range, df.volume)
+            self.figure.y_range.end /= self._scheme.volscaling
+
+        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}volume_colors', line_color="black", **kwargs)
+
+        hover_target = None if self._scheme.merge_data_hovers else self.figure
+        self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", hover_target)
+
+    def plot_observer(self, obj, master):
+        self._plot_indicator_observer(obj, master)
+
+    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array = None):
+        self._plot_indicator_observer(obj, master, strat_clk)
+
+    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array = None):
         pl = plotobj2label(obj)
 
         self._figure_append_title(pl)
         indlabel = obj.plotlabel()
+        if self._multistrat:
+            pass
         plotinfo = obj.plotinfo
 
         for lineidx in range(obj.size()):
@@ -298,7 +422,8 @@ class Figure(object):
             else:
                 self._add_hover_renderer(renderer)
 
-            hover_label = f"{indlabel} - {linealias}"
+            hover_label_suffix = f" - {linealias}" if obj.size() > 1 else ""  # we need no suffix if there is just one line in the indicator anyway
+            hover_label = (pl if self._multistrat else indlabel) + hover_label_suffix
             hover_data = f"@{source_id}{{{self._scheme.number_format}}}"
             if not self._scheme.merge_data_hovers:
                 # add hover tooltip for indicators/observers's data
@@ -355,114 +480,3 @@ class Figure(object):
     @staticmethod
     def _source_id(source):
         return str(id(source))
-
-    def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
-        source_id = Figure._source_id(data)
-        title = sanitize_source_name(data)
-        if len(data._env.strats) > 1:
-            title += f" ({strategy2label(type(self._strategy), self._strategy.params)})"
-
-        # append to title
-        self._figure_append_title(title)
-
-        df = convert_to_pandas(strat_clk, data, self._start, self._end)
-
-        # configure colors
-        colorup = convert_color(self._scheme.barup)
-        colordown = convert_color(self._scheme.bardown)
-        colorup_wick = convert_color(self._scheme.barup_wick)
-        colordown_wick = convert_color(self._scheme.bardown_wick)
-        colorup_outline = convert_color(self._scheme.barup_outline)
-        colordown_outline = convert_color(self._scheme.bardown_outline)
-        is_up = df.close > df.open
-
-        self._add_to_cds(df.open, source_id + 'open')
-        self._add_to_cds(df.high, source_id + 'high')
-        self._add_to_cds(df.low, source_id + 'low')
-        self._add_to_cds(df.close, source_id + 'close')
-        self._add_to_cds([colorup if x else colordown for x in is_up], source_id + 'colors_bars')
-        self._add_to_cds([colorup_wick if x else colordown_wick for x in is_up], source_id + 'colors_wicks')
-        self._add_to_cds([colorup_outline if x else colordown_outline for x in is_up], source_id + 'colors_outline')
-
-        if self._scheme.style == 'line':
-            if data.plotinfo.plotmaster is None:
-                color = convert_color(self._scheme.loc)
-            else:
-                self._nextcolor(data.plotinfo.plotmaster)
-                color = convert_color(self._color(data.plotinfo.plotmaster))
-
-            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=title)
-            self._set_single_hover_renderer(renderer)
-
-            self._hoverc.add_hovertip("Close", f"@{source_id}close")
-        elif self._scheme.style == 'bar':
-            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
-            renderer = self.figure.vbar('index',
-                                        get_bar_width(),
-                                        source_id + 'open',
-                                        source_id + 'close',
-                                        source=self._cds,
-                                        fill_color=source_id + 'colors_bars',
-                                        line_color=source_id + 'colors_outline')
-
-            self._set_single_hover_renderer(renderer)
-
-            hover_target = None if self._scheme.merge_data_hovers else self.figure
-            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
-        else:
-            raise Exception(f"Unsupported style '{self._scheme.style}'")
-
-        adapt_yranges(self.figure.y_range, df.low, df.high)
-
-        # check if we have to plot volume overlay
-        if self._scheme.volume and self._scheme.voloverlay:
-            self.plot_volume(data, strat_clk, self._scheme.voltrans, True)
-
-    def plot_volume(self, data: bt.AbstractDataBase, strat_clk: array, alpha, extra_axis=False):
-        source_id = Figure._source_id(data)
-
-        df = convert_to_pandas(strat_clk, data, self._start, self._end)
-
-        if len(nanfilt(df.volume)) == 0:
-            return
-
-        colorup = convert_color(self._scheme.volup)
-        colordown = convert_color(self._scheme.voldown)
-
-        is_up = df.close > df.open
-        colors = [colorup if x else colordown for x in is_up]
-
-        self._add_to_cds(df.volume, f'{source_id}volume')
-        self._add_to_cds(colors, f'{source_id}volume_colors')
-
-        kwargs = {'fill_alpha': alpha,
-                  'line_alpha': alpha,
-                  'name': 'Volume',
-                  'legend_label': 'Volume'}
-
-        ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
-
-        if extra_axis:
-            self.figure.extra_y_ranges = {'axvol': DataRange1d()}
-            adapt_yranges(self.figure.extra_y_ranges['axvol'], df.volume)
-            self.figure.extra_y_ranges['axvol'].end /= self._scheme.volscaling
-
-            ax_color = colorup
-
-            ax = LinearAxis(y_range_name="axvol", formatter=ax_formatter,
-                            axis_label_text_color=ax_color, axis_line_color=ax_color, major_label_text_color=ax_color,
-                            major_tick_line_color=ax_color, minor_tick_line_color=ax_color)
-            self.figure.add_layout(ax, 'left')
-            kwargs['y_range_name'] = "axvol"
-        else:
-            self.figure.yaxis.formatter = ax_formatter
-            adapt_yranges(self.figure.y_range, df.volume)
-            self.figure.y_range.end /= self._scheme.volscaling
-
-        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}volume_colors', line_color="black", **kwargs)
-
-        hover_target = None if self._scheme.merge_data_hovers else self.figure
-        self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", hover_target)

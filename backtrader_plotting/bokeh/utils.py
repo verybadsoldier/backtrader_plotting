@@ -15,9 +15,8 @@ def convert_color(color):
         return matplotlib.colors.to_hex(color)
 
 
-def sanitize_source_name(data: bt.AbstractDataBase) -> str:
+def sanitize_source_name(name: str) -> str:
     """removes illegal characters from source name to make it compatible with Bokeh"""
-    name = data.shortname
     forbidden_chars = ' (),.-/*:'
     for fc in forbidden_chars:
         name = name.replace(fc, '_')

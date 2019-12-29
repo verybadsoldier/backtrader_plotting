@@ -33,5 +33,5 @@ if __name__ == '__main__':
 
     cerebro.run()
 
-    b = Bokeh(style='bar', plot_mode="single")
+    b = Bokeh(style='bar')
     cerebro.plot(b)

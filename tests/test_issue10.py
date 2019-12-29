@@ -88,7 +88,7 @@ def bokeh_plot(data):
 
     print('Final Portfolio Value: %.2f' % cerebro.broker.getvalue())
     # cerebro.plot(style='bar')
-    b = backtrader_plotting.Bokeh(style='bar', plot_mode='single', scheme=backtrader_plotting.schemes.Tradimo())
+    b = backtrader_plotting.Bokeh(style='bar', scheme=backtrader_plotting.schemes.Tradimo())
     figs = cerebro.plot(b)
 
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)

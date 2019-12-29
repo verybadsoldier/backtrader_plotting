@@ -5,7 +5,7 @@ import backtrader as bt
 from backtrader_plotting.utils import get_params_str
 
 
-def _datafeed2name(data: bt.AbstractDataBase):
+def datafeed_target(data: bt.AbstractDataBase):
     """Convert a datafeed to a readable string. If a name was provided manually then use that."""
 
     # try some popular attributes that might carry string represantations
@@ -38,6 +38,10 @@ def plotobj2label(obj):
         return f'{_indicator2label(obj)}@{_indicator2fullid(obj)}'
     elif isinstance(obj, bt.Observer):
         return f'{_observer2label(obj)}@{strategy2label(type(obj._owner), obj._owner.params)}'
+    elif isinstance(obj, bt.AbstractDataBase):
+        return obj.__class__.__name__
+    else:
+        raise RuntimeError(f'Unsupported type: {obj.__class__.__name__}')
 
 
 def _indicator2label(ind: bt.Indicator):
@@ -57,7 +61,7 @@ def _indicator2fullid(ind: bt.Indicator) -> str:
     names = []
     for x in ind.datas:
         if isinstance(x, bt.AbstractDataBase):
-            return _datafeed2name(x)
+            return datafeed_target(x)
         elif isinstance(x, bt.Indicator):
             names.append(_indicator2fullid(x))
     return f"({','.join(names)})"

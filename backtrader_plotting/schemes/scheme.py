@@ -39,7 +39,6 @@ class Scheme(_BtPlotScheme):
 
         self.analyzer_tab_width = 1860
         self.analyzer_tab_num_cols = 2
-        self.plot_mode = "tabs"
         self.plot_aspect_ratio = 3.0
         self.plot_sizing_mode = "scale_width"
 

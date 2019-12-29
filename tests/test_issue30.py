@@ -34,7 +34,7 @@ def test_github_issue30():
 
     cerebro.run()
 
-    b = backtrader_plotting.Bokeh(filename='chart.html',style='bar', plot_mode="single", scheme=Tradimo())
+    b = backtrader_plotting.Bokeh(filename='chart.html', style='bar', scheme=Tradimo())
 
     figs = cerebro.plot(b)
 

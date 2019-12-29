@@ -45,5 +45,5 @@ if __name__ == '__main__':
 
     columns = dict(pnl=get_pnl_gross)
 
-    b = Bokeh(style='bar', plot_mode="single", scheme=Tradimo())
+    b = Bokeh(style='bar', scheme=Tradimo())
     b.plot_result(result, columns)

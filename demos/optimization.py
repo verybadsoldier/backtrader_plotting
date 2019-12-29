@@ -39,5 +39,5 @@ if __name__ == '__main__':
 
     result = cerebro.run(optreturn=False)
 
-    b = Bokeh(style='bar', plot_mode="single", scheme=Tradimo())
+    b = Bokeh(style='bar', scheme=Tradimo())
     b.plot_result(result)

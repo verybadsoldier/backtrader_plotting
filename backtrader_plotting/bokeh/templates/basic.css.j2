@@ -6,20 +6,20 @@
 
     table.metaDataTable {
       border: 1px solid #1C6EA4;
-      background-color: #EEEEEE;
+      background-color: {{datatable_row_color_odd}};
       width: 100%;
       text-align: left;
       border-collapse: collapse;
     }
     table.metaDataTable td, table.metaDataTable th {
-      border: 1px solid #AAAAAA;
+      border: 1px solid {{datatable_row_color_odd}};
       padding: 3px 2px;
     }
     table.metaDataTable tbody td {
       font-size: 13px;
     }
     table.metaDataTable tr:nth-child(even) {
-      background: #D0E4F5;
+      background: {{datatable_row_color_even}};
     }
     table.metaDataTable tfoot td {
       font-size: 14px;

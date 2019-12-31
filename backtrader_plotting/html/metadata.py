@@ -27,10 +27,10 @@ def _get_table(header, data) -> str:
     return table
 
 
-def _get_datas(cerbebro: bt.cerebro) -> str:
+def _get_datas(strategy: bt.Strategy) -> str:
     md = '\n# Data Feeds\n'
 
-    for data in cerbebro.datas:
+    for data in strategy.datas:
         md += f'## {data.__class__.__name__}\n'
 
         data = {
@@ -46,58 +46,53 @@ def _get_datas(cerbebro: bt.cerebro) -> str:
     return md
 
 
-def _get_strategies(cerbebro: bt.cerebro) -> str:
-    md = '\n# Strategies\n'
+def _get_strategy(strategy: bt.Strategy) -> str:
+    md = '\n# Strategy\n'
 
-    for s in cerbebro.runningstrats:
-        md += f'## {s.__class__.__name__}\n'
-        md += _get_parameter_table(s.params)
+    md += f'## {strategy.__class__.__name__}\n'
+    md += _get_parameter_table(strategy.params)
 
-        md += '### Indicators:\n\n'
-        for i in s.getindicators():
-            md += f'{i.__class__.__name__}\n\n'
-            md += _get_parameter_table(i.params)
+    md += '### Indicators:\n\n'
+    for i in strategy.getindicators():
+        md += f'{i.__class__.__name__}\n\n'
+        md += _get_parameter_table(i.params)
 
-        md += 'Source Code:\n'
-        md += f'\n```\n{inspect.getsource(s.__class__)}\n```\n\n'
+    md += 'Source Code:\n'
+    md += f'\n```\n{inspect.getsource(strategy.__class__)}\n```\n\n'
 
     return md
 
 
-def _get_analyzers(cerbebro: bt.cerebro) -> str:
+def _get_analyzers(strategy: bt.Strategy) -> str:
     md = '\n# Analyzers\n'
 
-    strat = cerbebro.runningstrats[0]
-
-    for a in strat.analyzers:
+    for a in strategy.analyzers:
         md += f'## {a.__class__.__name__}\n'
         md += _get_parameter_table(a.params)
 
     return md
 
 
-def _get_observers(cerbebro: bt.cerebro) -> str:
+def _get_observers(strategy: bt.Strategy) -> str:
     md = '\n# Observers\n'
 
-    strat = cerbebro.runningstrats[0]
-
-    for o in strat.observers:
+    for o in strategy.observers:
         md += f'## {o.__class__.__name__}\n'
         md += _get_parameter_table(o.params)
 
     return md
 
 
-def get_metadata_div(cerebro: bt.cerebro) -> str:
+def get_metadata_div(strategy: bt.Strategy) -> str:
     md = ""
 
-    md += _get_datas(cerebro)
+    md += _get_datas(strategy)
     md += '* * *'
-    md += _get_analyzers(cerebro)
+    md += _get_analyzers(strategy)
     md += '* * *'
-    md += _get_observers(cerebro)
+    md += _get_observers(strategy)
     md += '* * *'
-    md += _get_strategies(cerebro)
+    md += _get_strategy(strategy)
     md += '* * *'
 
     css_classes = {'table': 'metaDataTable'}

@@ -73,5 +73,5 @@ class Scheme(_BtPlotScheme):
         self.axis_tickformat_hours = "%d %b %R"
 
         self.axis_tickformat_days = "%d %b %R"
-        self.axis_tickformat_months = "%m/%Y"
+        self.axis_tickformat_months = "%D"
         self.axis_tickformat_years = "%Y %b"

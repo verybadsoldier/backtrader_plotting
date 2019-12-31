@@ -37,7 +37,7 @@ def plotobj2label(obj):
     if isinstance(obj, bt.Indicator):
         return f'{_indicator2label(obj)}@{_indicator2fullid(obj)}'
     elif isinstance(obj, bt.Observer):
-        return f'{_observer2label(obj)}@{strategy2label(type(obj._owner), obj._owner.params)}'
+        return f'{_observer2label(obj)}'
     elif isinstance(obj, bt.AbstractDataBase):
         return obj.__class__.__name__
     else:

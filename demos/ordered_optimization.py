@@ -50,4 +50,4 @@ if __name__ == '__main__':
     ordered_result = OrderedOptResult("Profit & Losss", ordered_result)
 
     b = Bokeh(style='bar', scheme=Tradimo())
-    b.plot_result(ordered_result)
+    b.plot_and_show(ordered_result)

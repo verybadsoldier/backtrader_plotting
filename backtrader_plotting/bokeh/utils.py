@@ -1,3 +1,7 @@
+from typing import Union
+
+from backtrader_plotting import bttypes
+
 from jinja2 import Environment, PackageLoader
 import backtrader
 import matplotlib.colors
@@ -82,3 +86,9 @@ def generate_stylesheet(scheme, template="basic.css.j2") -> str:
                            )
                       )
     return css
+
+
+def get_limited_optresult(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult], num_item_limit=None):
+    if num_item_limit is None:
+        return optresult
+    return optresult[0:num_item_limit]

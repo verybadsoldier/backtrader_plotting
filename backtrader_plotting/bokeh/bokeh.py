@@ -1,27 +1,22 @@
 from array import array
 import bisect
 import datetime
-import inspect
 import itertools
 import logging
 import re
 import os
 import sys
 import tempfile
-from typing import List, Dict, Callable, Optional, Union, Tuple
+from typing import List, Dict, Optional, Union, Tuple
 
 import backtrader as bt
-from backtrader_plotting.utils import get_data_obj
 
 from bokeh.models import ColumnDataSource, Model
-from bokeh.models.widgets import Panel, Tabs, DataTable, TableColumn
-from bokeh.layouts import column, gridplot, row
-from bokeh.server.server import Server
-from bokeh.document import Document
-from bokeh.application import Application
-from bokeh.application.handlers.function import FunctionHandler
+from bokeh.models.widgets import Panel, Tabs
+from bokeh.layouts import column, gridplot
+
 from bokeh.embed import file_html
-from bokeh.models.widgets import NumberFormatter, StringFormatter, Div
+from bokeh.models.widgets import Div
 from bokeh.resources import CDN
 from bokeh.util.browser import view
 
@@ -47,8 +42,9 @@ if 'ipykernel' in sys.modules:
 
 
 class FigurePage(object):
-    def __init__(self):
+    def __init__(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self.figures: List[Figure] = []
+        self.strategy: Optional[bt.Strategy] = obj if isinstance(obj, bt.Strategy) else None
         self.cds: ColumnDataSource = None
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
@@ -58,32 +54,31 @@ class Bokeh(metaclass=bt.MetaParams):
     params = (('scheme', Blackly()),
               ('filename', None),
               ('plotconfig', None),
-              ('inmemory', False),
+              ('output_mode', 'show'),
               ('tabs', 'single'),
+              ('show', True)
               )
 
-    def __init__(self, cerebro: bt.Cerebro, **kwargs):
+    def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
             setattr(self.p.scheme, pname, pvalue)
 
         self._iplot: bool = None
-        self._num_plots = 0
         self._tablegen = TableGenerator(self.p.scheme)
         if not isinstance(self.p.scheme, Scheme):
             raise Exception("Provided scheme has to be a subclass of backtrader_plotting.schemes.scheme.Scheme")
 
         self._initialized: bool = False
         self._is_optreturn: bool = False  # when optreturn is active during optimization then we get a thinned out result only
-        self._figurepage: Optional[FigurePage] = None
-        self._cerebro: bt.Cerebro = cerebro
+        self._current_fig_idx: Optional[int] = None
+        self._figurepages: List[FigurePage] = []
 
-    def _configure_plotting(self):
-        for strategy in self._cerebro.runningstrats:
-            datas, inds, obs = strategy.datas, strategy.getindicators(), strategy.getobservers()
+    def _configure_plotting(self, strategy: bt.Strategy):
+        datas, inds, obs = strategy.datas, strategy.getindicators(), strategy.getobservers()
 
-            for objs in [datas, inds, obs]:
-                for idx, obj in enumerate(objs):
-                    self._configure_plotobject(obj, idx, strategy)
+        for objs in [datas, inds, obs]:
+            for idx, obj in enumerate(objs):
+                self._configure_plotobject(obj, idx, strategy)
 
     def _configure_plotobject(self, obj, idx, strategy):
         if self.p.plotconfig is None:
@@ -171,8 +166,8 @@ class Bokeh(metaclass=bt.MetaParams):
         return data_graph, volume_graph
 
     @property
-    def figures(self):
-        return self._figurepage.figures
+    def _figurepage(self) -> FigurePage:
+        return self._figurepages[self._current_fig_idx]
 
     @staticmethod
     def _resolve_plotmaster(obj):
@@ -202,31 +197,9 @@ class Bokeh(metaclass=bt.MetaParams):
             end = bisect.bisect_right(st_dtime, bt.date2num(end))
 
         if end < 0:
-            end = len(st_dtime) + 1 + end  # -1 =  len() -2 = len() - 1
+            end = len(st_dtime) + 1 + end
 
         return start, end
-
-    def generate_result_model(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, num_item_limit=None) -> Model:
-        """Generates a model from a result object"""
-        if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
-            return self.generate_optresult_model(result, columns, num_item_limit)
-        elif bttypes.is_btresult(result):
-            for s in result:
-                self.plot(s)
-            return self.generate_model()
-        else:
-            raise Exception(f"Unsupported result type: {str(result)}")
-
-    def plot_result(self, result: Union[List[bt.Strategy], List[List[bt.OptReturn]]], columns=None, ioloop=None):
-        """Plot a cerebro result. Pass either a list of strategies or a list of list of optreturns."""
-        if bttypes.is_optresult(result) or bttypes.is_ordered_optresult(result):
-            self.run_optresult_server(result, columns, ioloop=ioloop)
-        elif bttypes.is_btresult(result):
-            for s in result:
-                self.plot(s)
-            self.show()
-        else:
-            raise Exception(f"Unsupported result type: {str(result)}")
 
     def _blueprint_strategy(self, strategy: bt.Strategy, start=None, end=None, **kwargs):
         if not strategy.datas:
@@ -274,7 +247,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, self._is_multistrat)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder)
 
             figure.plot(master, strat_clk, None)
 
@@ -305,50 +278,51 @@ class Bokeh(metaclass=bt.MetaParams):
         # volume graphs
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, self._is_multistrat)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder)
             figure.plot_volume(v, strat_clk, 1.0)
             self._figurepage.figures.append(figure)
 
-    def plot_and_generate_optmodel(self, objs: List[Union[bt.Strategy, bt.OptReturn]]):
+    def plot_and_generate_optmodel(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self._reset()
-        for obj in objs:
-            self.plot(obj)
-        return self.generate_model()
+        self.plot(obj)
+
+        # we support only one strategy at a time so pass fixed zero index
+        # if we ran optresults=False then we have a full strategy object -> pass it to get full plot
+        return self.generate_model(0)
 
     @staticmethod
     def _sort_plotobjects(objs: List[Figure]) -> None:
         objs.sort(key=lambda x: x.plotorder)
 
     # region Generator Methods
-    def generate_model(self) -> Model:
+    def generate_model(self, figurepage_idx: int) -> Model:
         """Returns a model generated from internal blueprints"""
+        if figurepage_idx >= len(self._figurepages):
+            raise RuntimeError(f'Cannot generate model for FigurePage with index {figurepage_idx} as there are only {len(self._figurepages)}.')
+
+        figurepage = self._figurepages[figurepage_idx]
         if not self._is_optreturn:
-            panels = self._generate_model_panels(self._figurepage)
+            tabs = self._generate_model_tabs(figurepage)
+        else:
+            tabs = []
 
         # now append analyzer tab(s)
+        analyzers = figurepage.analyzers
+        panel_analyzer = self._get_analyzer_panel(analyzers)
+        if panel_analyzer is not None:
+            tabs.append(panel_analyzer)
+
+        # append meta tab
         if not self._is_optreturn:
-            for strategy in self._cerebro.runningstrats:
-                strat_analyzers = [x for x in self._figurepage.analyzers if x.strategy is strategy]
+            assert figurepage.strategy is not None
+            meta = Div(text=metadata.get_metadata_div(figurepage.strategy))
+            metapanel = Panel(child=meta, title="Meta")
+            tabs.append(metapanel)
 
-                analyzer_name_suffix = None
-                if len(self._cerebro.runningstrats) > 1:
-                    analyzer_name_suffix = label_resolver.strategy2shortname(strategy)
-                panel_analyzer = self._get_analyzer_panel(strat_analyzers, analyzer_name_suffix)
-                if panel_analyzer is not None:
-                    panels.append(panel_analyzer)
-        else:
-            panel_analyzer = self._get_analyzer_panel(self._cerebro.analyzers)
-            if panel_analyzer is not None:
-                panels.append(panel_analyzer)
-
-        meta = Div(text=metadata.get_metadata_div(self._cerebro))
-        metapanel = Panel(child=meta, title="Meta")
-        panels.append(metapanel)
-
-        model = Tabs(tabs=panels)
+        model = Tabs(tabs=tabs)
 
         # attach the model to the underlying figure for later reference (e.g. unit test)
-        self._figurepage.model = model
+        figurepage.model = model
 
         return model
 
@@ -365,17 +339,12 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.tabs}"')
 
-    @property
-    def _is_multistrat(self) -> bool:
-        """True if running on more than one strategy"""
-        return len(self._cerebro.runningstrats) > 1
-
-    def _generate_model_panels(self, fp: FigurePage) -> List[Panel]:
+    def _generate_model_tabs(self, fp: FigurePage) -> List[Panel]:
         observers = [x for x in fp.figures if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figures if isinstance(x.master, bt.DataBase)]
         inds = [x for x in fp.figures if isinstance(x.master, bt.Indicator)]
 
-        panels = []
+        tabs = []
 
         def build_panel(objects, panel_title):
             if len(objects) == 0:
@@ -388,7 +357,7 @@ class Bokeh(metaclass=bt.MetaParams):
                          toolbar_location=self.p.scheme.toolbar_location,
                          sizing_mode=self.p.scheme.plot_sizing_mode,
                          )
-            panels.append(Panel(title=panel_title, child=g))
+            tabs.append(Panel(title=panel_title, child=g))
 
         # now assign figures to tabs
         # 1. assign default tabs if no manual tab is assigned
@@ -408,21 +377,12 @@ class Bokeh(metaclass=bt.MetaParams):
             build_panel(list(figures), tabname)
 
         # group observers by associated strategy
-        for strategy in self._cerebro.runningstrats:
-            strat_observers = [x for x in observers if x.master._owner is strategy]
+        build_panel(observers, "Observers")
 
-            if len(self._cerebro.runningstrats) > 1:
-                # add a a strategy suffix if we show multiple tabs
-                title_suffix = f' - {label_resolver.strategy2shortname(strategy)}'
-            else:
-                title_suffix = ''
-
-            build_panel(strat_observers, "Observers" + title_suffix)
-
-        return panels
+        return tabs
     # endregion
 
-    def _get_analyzer_panel(self, analyzers: List[bt.Analyzer], name_suffix=None) -> Optional[Panel]:
+    def _get_analyzer_panel(self, analyzers: List[bt.Analyzer]) -> Optional[Panel]:
         def _get_column_row_count(col) -> int:
             return sum([x.height for x in col if x.height is not None])
 
@@ -438,18 +398,15 @@ class Bokeh(metaclass=bt.MetaParams):
             acolumns.append(column([table_header] + elements))
 
         childs = gridplot(acolumns, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None})
-        name = "Analyzers"
-        if name_suffix is not None:
-            name += f" - {name_suffix}"
-        return Panel(child=childs, title=name)
+        return Panel(child=childs, title='Analyzers')
 
     def _output_stylesheet(self, template="basic.css.j2"):
         return generate_stylesheet(self.p.scheme, template)
 
-    def _output_plot_file(self, model, filename=None, template="basic.html.j2"):
+    def _output_plot_file(self, model, idx, filename=None, template="basic.html.j2"):
         if filename is None:
             tmpdir = tempfile.gettempdir()
-            filename = os.path.join(tmpdir, f"bt_bokeh_plot_{self._num_plots}.html")
+            filename = os.path.join(tmpdir, f"bt_bokeh_plot_{idx}.html")
 
         env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
         templ = env.get_template(template)
@@ -475,21 +432,22 @@ class Bokeh(metaclass=bt.MetaParams):
     #  region interface for backtrader
     def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, **kwargs):
         """Called by backtrader to plot either a strategy or an optimization result."""
+
+        # prepare new FigurePage
+        self._figurepages.append(FigurePage(obj))
+        self._current_fig_idx = len(self._figurepages) - 1
+        self._is_optreturn = isinstance(obj, bt.OptReturn)
+
+        if isinstance(obj, bt.Strategy):
+            # only configure plotting for regular backtesting (not for optimization)
+            self._configure_plotting(obj)
+
         if numfigs > 1:
             raise Exception("numfigs must be 1")
         if use is not None:
             raise Exception("Different backends by 'use' not supported")
 
         self._iplot = iplot and 'ipykernel' in sys.modules
-
-        # do initialization on the first strategy we are handed
-        if not self._initialized:
-            self._is_optreturn = isinstance(obj, bt.OptReturn)
-            self._figurepage = FigurePage()
-            if isinstance(obj, bt.Strategy):
-                # only configure plotting for regular backtesting (not for optimization)
-                self._configure_plotting()
-            self._initialized = True
 
         if isinstance(obj, bt.Strategy):
             self._blueprint_strategy(obj, start, end, **kwargs)
@@ -499,36 +457,33 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise Exception(f'Unsupported plot source object: {str(type(obj))}')
 
-        # backtrader will call us multiple times and expects every strategy being plotted to a separate figure
-        # but we do only one figure and we return always the same figure page object
         return [self._figurepage]
 
     def show(self):
         """Display a figure (called by backtrader)."""
-        model: Model = self.generate_model()
+        for idx in range(len(self._figurepages)):
+            model = self.generate_model(idx)
 
-        if self.p.inmemory is False:
-            if self._iplot:
-                css = self._output_stylesheet()
-                display(HTML(css))
-                show(model)
+            if self.p.output_mode in ['show', 'save']:
+                if self._iplot:
+                    css = self._output_stylesheet()
+                    display(HTML(css))
+                    show(model)
+                else:
+                    filename = self._output_plot_file(model, idx, self.p.filename)
+                    if self.p.output_mode == 'show':
+                        view(filename)
+            elif self.p.output_mode == 'memory':
+                pass
             else:
-                filename = self._output_plot_file(model, self.p.filename)
-                view(filename)
+                raise RuntimeError(f'Invalid parameter "output_mode" with value: {self.p.output_mode}')
 
         self._reset()
-        self._num_plots += 1
     #  endregion
 
     def _reset(self):
-        self._figurepage = FigurePage()
+        self._figurepages = []
         self._is_optreturn = False
-
-    @staticmethod
-    def _get_limited_optresult(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult], num_item_limit=None):
-        if num_item_limit is None:
-            return optresult
-        return optresult[0:num_item_limit]
 
     @staticmethod
     def _get_opt_count(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult]):
@@ -538,91 +493,4 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             # OptResult
             return len(optresult[0])
-
-    def generate_optresult_model(self, optresults,
-                                 columns=None,
-                                 num_item_limit=None) -> Model:
-        """Generates and returns an interactive model for an OptResult or an OrderedOptResult"""
-        cds = ColumnDataSource()
-        tab_columns = []
-
-        col_formatter_num = NumberFormatter(format='0.000')
-        col_formatter_str = StringFormatter()
-        opts = optresults if bttypes.is_optresult(optresults) else [x.result for x in optresults.optresult]
-        if bttypes.is_ordered_optresult(optresults):
-            benchmarks = [x.benchmark for x in Bokeh._get_limited_optresult(optresults.optresult, num_item_limit)]
-            cds.add(benchmarks, "benchmark")
-            tab_columns.append(TableColumn(field='benchmark', title=optresults.benchmark_label, sortable=False, formatter=col_formatter_num))
-
-        for idx, optresult in enumerate(opts[0]):
-            # add suffix when dealing with more than 1 strategy
-            strat_suffix = ''
-            if len(opts[0]) > 1:
-                strat_suffix = f' [{idx}]'
-
-            for name, val in optresult.params._getitems():
-                # get value for the current param for all results
-                pvals = []
-                formatter = col_formatter_num
-                for opt in Bokeh._get_limited_optresult(opts, num_item_limit):
-                    param = opt[idx].params._get(name)
-                    if inspect.isclass(param):
-                        paramstr = param.__name__
-                    else:
-                        paramstr = param
-                    pvals.append(paramstr)
-
-                if len(pvals) > 0 and isinstance(pvals[0], str):
-                    formatter = col_formatter_str
-                tab_columns.append(TableColumn(field=f"{idx}_{name}", title=f'{name}{strat_suffix}', sortable=False, formatter=formatter))
-
-                cds.add(pvals, f"{idx}_{name}")
-
-        # add user columns specified by parameter 'columns'
-        if columns is not None:
-            for k, v in columns.items():
-                ll = [str(v(x)) for x in Bokeh._get_limited_optresult(optresults, num_item_limit)]
-                cds.add(ll, k)
-                tab_columns.append(TableColumn(field=k, title=k, sortable=False, formatter=col_formatter_str))
-
-        selector = DataTable(source=cds, columns=tab_columns, width=1600, height=150)
-
-        model = column([selector, self.plot_and_generate_optmodel(opts[0])])
-
-        def update(_name, _old, new):
-            if len(new) == 0:
-                return
-
-            stratidx = new[0]
-            model.children[-1] = self.plot_and_generate_optmodel(opts[stratidx])
-
-        cds.selected.on_change('indices', update)
-        return model
-
-    def run_optresult_server(self, result: bttypes.OptResult, columns: Dict[str, Callable]=None, ioloop=None):
-        """Serves an optimization resulst as a Bokeh application running on a web server"""
-        def make_document(doc: Document):
-            doc.title = "Backtrader Optimization Result"
-
-            env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
-            doc.template = env.get_template("basic.html.j2")
-
-            model = self.generate_optresult_model(result, columns)
-            doc.add_root(model)
-
-        Bokeh._run_server(make_document, ioloop=ioloop)
-
-    @staticmethod
-    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):
-        """Runs a Bokeh webserver application. Documents will be created using fnc_make_document"""
-        handler = FunctionHandler(fnc_make_document)
-        app = Application(handler)
-        if iplot and 'ipykernel' in sys.modules:
-            show(app, notebook_url=notebook_url)
-        else:
-            apps = {'/': app}
-
-            print("Open your browser here: http://localhost")
-            server = Server(apps, port=port, io_loop=ioloop)
-            server.run_until_shutdown()
     #  endregion

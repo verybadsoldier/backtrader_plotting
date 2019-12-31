@@ -52,7 +52,7 @@ class HoverContainer(object):
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, multistrat: bool):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._hoverc = hoverc
@@ -67,7 +67,6 @@ class Figure(object):
         self.plottab = None
         self.plotorder = plotorder
         self.datas = []  # list of all datas that have been plotted to this figure
-        self._multistrat: bool = multistrat
         self._init_figure()
 
     def _set_single_hover_renderer(self, ren: Renderer):
@@ -321,8 +320,6 @@ class Figure(object):
 
         self._figure_append_title(pl)
         indlabel = obj.plotlabel()
-        if self._multistrat:
-            pass
         plotinfo = obj.plotinfo
 
         for lineidx in range(obj.size()):
@@ -423,7 +420,7 @@ class Figure(object):
                 self._add_hover_renderer(renderer)
 
             hover_label_suffix = f" - {linealias}" if obj.size() > 1 else ""  # we need no suffix if there is just one line in the indicator anyway
-            hover_label = (pl if self._multistrat else indlabel) + hover_label_suffix
+            hover_label = indlabel + hover_label_suffix
             hover_data = f"@{source_id}{{{self._scheme.number_format}}}"
             if not self._scheme.merge_data_hovers:
                 # add hover tooltip for indicators/observers's data

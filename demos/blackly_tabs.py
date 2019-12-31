@@ -27,11 +27,13 @@ if __name__ == '__main__':
         dataname="datas/orcl-1995-2014.txt",
         fromdate=datetime.datetime(2000, 1, 1),
         todate=datetime.datetime(2001, 2, 28),
+        reverse=False,
+        swapcloses=True,
     )
     cerebro.adddata(data)
     cerebro.addanalyzer(bt.analyzers.SharpeRatio)
 
     cerebro.run()
 
-    b = Bokeh(style='bar')
+    b = Bokeh(style='bar', tabs='multi')
     cerebro.plot(b)

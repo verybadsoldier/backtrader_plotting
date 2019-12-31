@@ -66,7 +66,7 @@ def test_std_backtest_volume_subplot(cerebro: bt.Cerebro):
     figs = cerebro.plot(b)
 
     assert len(figs) == 1
-    assert_num_tabs(figs, 4)
+    assert_num_tabs(figs, 3)
     assert_num_figures(figs, 5)
 
 
@@ -75,11 +75,11 @@ def test_std_backtest(cerebro: bt.Cerebro):
     cerebro.run()
 
     s = backtrader_plotting.schemes.Blackly()
-    b = Bokeh(style='bar', scheme=s, output_mode=_output_mode)
+    b = Bokeh(style='line', scheme=s, output_mode=_output_mode)
     figs = cerebro.plot(b)
 
     assert len(figs) == 1
-    assert_num_tabs(figs, 4)
+    assert_num_tabs(figs, 3)
     assert_num_figures(figs, 4)
 
 
@@ -111,7 +111,7 @@ def test_std_backtest_ind_subplot(cerebro: bt.Cerebro):
 
     figs = cerebro.plot(b)
 
-    assert_num_tabs(figs, 4)
+    assert_num_tabs(figs, 3)
     assert_num_figures(figs, 5)
 
 
@@ -125,7 +125,7 @@ def test_backtest_2strats(cerebro: bt.Cerebro):
     figs = cerebro.plot(b)
 
     assert len(figs) == 2
-    assert_num_tabs(figs, 4, 4)
+    assert_num_tabs(figs, 3, 3)
     assert_num_figures(figs, 4, 4)
 
 

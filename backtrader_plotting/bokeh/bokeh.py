@@ -367,17 +367,17 @@ class Bokeh(metaclass=bt.MetaParams):
         for figure in [x for x in inds if x.plottab is None]:
             figure.plottab = 'Plots' if self.is_tabs_single else 'Indicators'
 
+        for figure in [x for x in observers if x.plottab is None]:
+            figure.plottab = 'Plots' if self.is_tabs_single else 'Observers'
+
         # 2. group panels by desired tabs
         # groupby expects the groups to be sorted or else will produce duplicated groups
-        sorted_figs = list(itertools.chain(datas, inds))
+        sorted_figs = list(itertools.chain(datas, inds, observers))
         sorted_figs.sort(key=lambda x: x.plottab)
         tabgroups = itertools.groupby(sorted_figs, lambda x: x.plottab)
 
         for tabname, figures in tabgroups:
             build_panel(list(figures), tabname)
-
-        # group observers by associated strategy
-        build_panel(observers, "Observers")
 
         return tabs
     # endregion

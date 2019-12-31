@@ -29,6 +29,7 @@ if __name__ == '__main__':
         fromdate=datetime.datetime(2000, 1, 1),
         todate=datetime.datetime(2001, 2, 28),
         reverse=False,
+        swapcloses=True,
     )
     cerebro.adddata(data)
     cerebro.addanalyzer(bt.analyzers.SharpeRatio)

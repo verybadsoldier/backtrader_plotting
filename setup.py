@@ -30,10 +30,11 @@ setuptools.setup(
     package_data={'backtrader_plotting.bokeh': ['templates/*.j2']},
 
     install_requires=[
+        'backtrader',
         'bokeh~=1.4.0',
         'jinja2',
-        'backtrader',
         'pandas',
         'matplotlib',
+        'markdown2',
     ],
 )

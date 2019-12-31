@@ -244,7 +244,9 @@ class Figure(object):
                                         source_id + 'close',
                                         source=self._cds,
                                         fill_color=source_id + 'colors_bars',
-                                        line_color=source_id + 'colors_outline')
+                                        line_color=source_id + 'colors_outline',
+                                        legend_label=title,
+                                        )
 
             self._set_single_hover_renderer(renderer)
 

@@ -11,7 +11,7 @@ from tests.strategies.togglestrategy import ToggleStrategy
 from tests.asserts.asserts import assert_num_tabs, assert_num_figures
 
 # set to 'show' for debugging
-_output_mode = 'memory'
+_output_mode = 'show'
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ def test_std_backtest(cerebro: bt.Cerebro):
     cerebro.run()
 
     s = backtrader_plotting.schemes.Blackly()
-    b = Bokeh(style='line', scheme=s, output_mode=_output_mode)
+    b = Bokeh(style='bar', scheme=s, output_mode=_output_mode)
     figs = cerebro.plot(b)
 
     assert len(figs) == 1

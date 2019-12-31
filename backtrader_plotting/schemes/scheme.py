@@ -5,6 +5,14 @@ class Scheme(_BtPlotScheme):
     def __init__(self):
         super().__init__()
 
+        """
+        hover tooltips of datas will contain all other datas and all indicators/observers
+        if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data
+        """
+        self.merge_data_hovers = True
+        self.tabs = 'single'
+        self.show_headline = True
+
         self.barup_wick = self.barup
         self.bardown_wick = self.bardown
 
@@ -53,16 +61,8 @@ class Scheme(_BtPlotScheme):
 
         self.text_color = 'lightgrey'
 
-        self.show_headline = True
-
         # https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html#bokeh.models.formatters.DatetimeTickFormatter
         self.hovertool_timeformat = '%F %R'
-
-        """
-        hover tooltips of datas will contain all other datas and all indicators/observers
-        if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data
-        """
-        self.merge_data_hovers = True
 
         self.number_format = '0,0.000'
         self.number_format_volume = '0.00 a'

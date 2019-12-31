@@ -55,7 +55,6 @@ class Bokeh(metaclass=bt.MetaParams):
               ('filename', None),
               ('plotconfig', None),
               ('output_mode', 'show'),
-              ('tabs', 'single'),
               ('show', True)
               )
 
@@ -247,7 +246,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
 
             figure.plot(master, strat_clk, None)
 
@@ -278,7 +277,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # volume graphs
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, False, len(strategy.datas) > 1)
             figure.plot_volume(v, strat_clk, 1.0)
             self._figurepage.figures.append(figure)
 
@@ -332,12 +331,12 @@ class Bokeh(metaclass=bt.MetaParams):
 
     @property
     def is_tabs_single(self) -> bool:
-        if self.p.tabs == 'single':
+        if self.p.scheme.tabs == 'single':
             return True
-        elif self.p.tabs == 'multi':
+        elif self.p.scheme.tabs == 'multi':
             return False
         else:
-            raise RuntimeError(f'Invalid tabs parameter "{self.p.tabs}"')
+            raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
     def _generate_model_tabs(self, fp: FigurePage) -> List[Panel]:
         observers = [x for x in fp.figures if isinstance(x.master, bt.Observer)]

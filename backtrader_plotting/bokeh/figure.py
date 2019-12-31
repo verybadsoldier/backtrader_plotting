@@ -52,21 +52,22 @@ class HoverContainer(object):
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
-        self._hoverc = hoverc
         self._scheme = scheme
         self._start = start
         self._end = end
         self.figure = None
-        self._hover: HoverTool = None
-        self._coloridx = collections.defaultdict(lambda: -1)
         self._hover_line_set = False
+        self._hover: HoverTool = None
+        self._hoverc = hoverc
+        self._coloridx = collections.defaultdict(lambda: -1)
         self.master = master
         self.plottab = None
         self.plotorder = plotorder
         self.datas = []  # list of all datas that have been plotted to this figure
+        self._is_multidata = is_multidata
         self._init_figure()
 
     def _set_single_hover_renderer(self, ren: Renderer):
@@ -196,12 +197,9 @@ class Figure(object):
 
         self.datas.append(obj)
 
-
     def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(label_resolver.datafeed_target(data))
-        if len(data._env.strats) > 1:
-            title += f" ({strategy2label(type(self._strategy), self._strategy.params)})"
 
         # append to title
         self._figure_append_title(title)
@@ -251,10 +249,11 @@ class Figure(object):
             self._set_single_hover_renderer(renderer)
 
             hover_target = None if self._scheme.merge_data_hovers else self.figure
-            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
+            legend_prefix = "" if not self._is_multidata or not self._scheme.merge_data_hovers else f"{title}/"
+            self._hoverc.add_hovertip(f"{legend_prefix}Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip(f"{legend_prefix}High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip(f"{legend_prefix}Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip(f"{legend_prefix}Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 

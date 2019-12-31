@@ -83,6 +83,29 @@ def test_std_backtest(cerebro: bt.Cerebro):
     assert_num_figures(figs, 4)
 
 
+def test_std_backtest_2datas(cerebro: bt.Cerebro):
+    datapath = 'datas/nvda-1999-2014.txt'
+    data = bt.feeds.YahooFinanceCSVData(
+        dataname=datapath,
+        fromdate=datetime.datetime(1998, 1, 1),
+        todate=datetime.datetime(2000, 12, 31),
+        reverse=False,
+        swapcloses=True,
+    )
+    cerebro.adddata(data)
+
+    cerebro.addstrategy(bt.strategies.MA_CrossOver)
+    cerebro.run()
+
+    s = backtrader_plotting.schemes.Blackly()
+    b = Bokeh(style='bar', scheme=s, output_mode=_output_mode, merge_data_hovers=True)
+    figs = cerebro.plot(b)
+
+    assert len(figs) == 1
+    assert_num_tabs(figs, 3)
+    assert_num_figures(figs, 4)
+
+
 def test_std_backtest_tabs_multi(cerebro: bt.Cerebro):
     cerebro.addstrategy(bt.strategies.MA_CrossOver)
     cerebro.run()

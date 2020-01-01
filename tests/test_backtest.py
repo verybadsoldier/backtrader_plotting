@@ -11,7 +11,7 @@ from tests.strategies.togglestrategy import ToggleStrategy
 from tests.asserts.asserts import assert_num_tabs, assert_num_figures
 
 # set to 'show' for debugging
-_output_mode = 'show'
+_output_mode = 'memory'
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ def test_std_backtest_2datas(cerebro: bt.Cerebro):
 
     assert len(figs) == 1
     assert_num_tabs(figs, 3)
-    assert_num_figures(figs, 4)
+    assert_num_figures(figs, 5)
 
 
 def test_std_backtest_tabs_multi(cerebro: bt.Cerebro):

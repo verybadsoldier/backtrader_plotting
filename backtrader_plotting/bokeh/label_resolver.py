@@ -1,28 +1,39 @@
-from typing import Optional
+from typing import List, Optional, Union
 
 import backtrader as bt
 
 from backtrader_plotting.utils import get_params_str
 
 
-def datafeed_target(data: bt.AbstractDataBase):
-    """Convert a datafeed to a readable string. If a name was provided manually then use that."""
+def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
+    """Convert datas (usually a datafeed but might also be an indicator if one indicator operates on another indicator) to a readable string.
+    If a name was provided manually then use that."""
 
     # try some popular attributes that might carry string represantations
     # _name: user assigned value upon instantiation
     # shortname: used by some datafeeds
     # _dataname: underlying bt dataname (should always be available as last resort)
     prim_names = ['_name', 'shortname', '_dataname']
-    for n in prim_names:
-        val = getattr(data, n, "")
-        if val is None:
-            continue
-        val = str(val)
+    labels = []
+    for d in datas:
+        if isinstance(d, bt.Indicator):
+            labels.append(indicator2label(d))
+        elif isinstance(d, bt.AbstractDataBase):
+            for n in prim_names:
+                val = getattr(d, n, "")
+                if val is None:
+                    continue
+                val = str(val)
 
-        if len(val) > 0:
-            return val
+                if len(val) > 0:
+                    labels.append(val)
+                    break
+        else:
+            raise RuntimeError(f'Unexpected data type: {d.__class__}')
 
-    return "Unidentified"
+    if len(labels) == 0:
+        return "Unidentified"
+    return ','.join(labels)
 
 
 def strategy2label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoClass]) -> str:
@@ -35,20 +46,20 @@ def strategy2label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoCla
 
 def plotobj2label(obj):
     if isinstance(obj, bt.Indicator):
-        return f'{_indicator2label(obj)}@{_indicator2fullid(obj)}'
+        return f'{indicator2label(obj)}@{_indicator2fullid(obj)}'
     elif isinstance(obj, bt.Observer):
-        return f'{_observer2label(obj)}'
+        return f'{observer2label(obj)}'
     elif isinstance(obj, bt.AbstractDataBase):
         return obj.__class__.__name__
     else:
         raise RuntimeError(f'Unsupported type: {obj.__class__.__name__}')
 
 
-def _indicator2label(ind: bt.Indicator):
+def indicator2label(ind: bt.Indicator):
     return ind.plotlabel()
 
 
-def _observer2label(obs: bt.Observer):
+def observer2label(obs: bt.Observer):
     return obs.plotlabel()
 
 
@@ -61,7 +72,7 @@ def _indicator2fullid(ind: bt.Indicator) -> str:
     names = []
     for x in ind.datas:
         if isinstance(x, bt.AbstractDataBase):
-            return datafeed_target(x)
+            return datatarget2label([x])
         elif isinstance(x, bt.Indicator):
-            names.append(_indicator2fullid(x))
+            names.append(indicator2label(x))
     return f"({','.join(names)})"

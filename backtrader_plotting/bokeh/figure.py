@@ -1,5 +1,6 @@
 from array import array
 import collections
+import itertools
 from typing import List, Union
 
 import backtrader as bt
@@ -12,24 +13,79 @@ from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 
 from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.bokeh.label_resolver import plotobj2label, strategy2label
+from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.utils import resample_line, convert_to_pandas, nanfilt, get_data_obj
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 
 
-class HoverContainer(object):
+class HoverContainer(metaclass=bt.MetaParams):
     """Class to store information about hover tooltips. Will be filled while Bokeh glyphs are created. After all figures are complete, hovers will be applied"""
+
+    params = (('hover_tooltip_config', None),
+              ('is_multidata', False)
+              )
+
     def __init__(self):
-        self._hover_tooltips = collections.defaultdict(list)
-        self._hover_tooltips_data = collections.defaultdict(list)
+        self._hover_tooltips = []
 
-    def add_hovertip(self, label: str, tmpl: str, target_figure=None) -> None:
-        """hover_target being None means all"""
-        self._hover_tooltips[target_figure].append((label, tmpl))
+        self._config = []
+        input_config = [] if len(self.p.hover_tooltip_config) == 0 else self.p.hover_tooltip_config.split(',')
+        for c in input_config:
+            if len(c) != 2:
+                raise RuntimeError(f'Invalid hover config entry "{c}"')
+            self._config.append((self._get_type(c[0]), self._get_type(c[1])))
 
-    def add_hovertip_for_data(self, label: str, tmpl: str, target_data) -> None:
-        """adds a hovertip for a target data"""
-        self._hover_tooltips_data[target_data].append((label, tmpl))
+    def add_hovertip(self, label: str, tmpl: str, src_obj=None) -> None:
+        self._hover_tooltips.append((label, tmpl, src_obj))
+
+    @staticmethod
+    def _get_type(t):
+        if t == 'd':
+            return bt.AbstractDataBase
+        elif t == 'i':
+            return bt.Indicator
+        elif t == 'o':
+            return bt.Observer
+        else:
+            raise RuntimeError(f'Invalid hovertool config type: "{t}')
+
+    def _apply_to_figure(self, fig, hovertool):
+        # provide ordering by two groups
+        tooltips_top = []
+        tooltips_bottom = []
+        for label, tmpl, src_obj in self._hover_tooltips:
+            apply = src_obj is fig.master  # apply to own
+            foreign = False
+            if not apply and (isinstance(src_obj, bt.Observer) or isinstance(src_obj, bt.Indicator)) and src_obj.plotinfo.subplot is False:
+                # add objects that are on the same figure cause subplot is False (for Indicators and Observers)
+                apply = src_obj._clock is fig.master
+            if not apply:
+                for c in self._config:
+                    if isinstance(src_obj, c[0]) and isinstance(fig.master, c[1]):
+                        apply = True
+                        foreign = True
+                        break
+
+            if apply:
+                prefix = ''
+                top = True
+                # prefix with data name if we got multiple datas
+                if self.p.is_multidata and foreign:
+                    if isinstance(src_obj, bt.Indicator):
+                        prefix = label_resolver.datatarget2label(src_obj.datas) + " - "
+                    elif isinstance(src_obj, bt.AbstractDataBase):
+                        prefix = label_resolver.datatarget2label([src_obj]) + " - "
+                    top = False
+
+                item = (prefix + label, tmpl)
+                if top:
+                    tooltips_top.append(item)
+                else:
+                    tooltips_bottom.append(item)
+
+        # first apply all top hover then all bottoms
+        for t in itertools.chain(tooltips_top, tooltips_bottom):
+            hovertool.tooltips.append(t)
 
     def apply_hovertips(self, figures: List['Figure']) -> None:
         """Add hovers to to all figures from the figures list"""
@@ -38,15 +94,9 @@ class HoverContainer(object):
                 if not isinstance(t, HoverTool):
                     continue
 
-                hv = self._hover_tooltips[None]
-                t.tooltips += hv
+                self._apply_to_figure(f, t)
+                break
 
-                if f.figure in self._hover_tooltips:
-                    t.tooltips += self._hover_tooltips[f.figure]
-
-                for d in f.datas:
-                    if d in self._hover_tooltips_data:
-                        t.tooltips += self._hover_tooltips_data[d]
 
 
 class Figure(object):
@@ -199,7 +249,7 @@ class Figure(object):
 
     def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
         source_id = Figure._source_id(data)
-        title = sanitize_source_name(label_resolver.datafeed_target(data))
+        title = sanitize_source_name(label_resolver.datatarget2label([data]))
 
         # append to title
         self._figure_append_title(title)
@@ -233,7 +283,7 @@ class Figure(object):
             renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=title)
             self._set_single_hover_renderer(renderer)
 
-            self._hoverc.add_hovertip("Close", f"@{source_id}close")
+            self._hoverc.add_hovertip("Close", f"@{source_id}close", data)
         elif self._scheme.style == 'bar':
             self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
             renderer = self.figure.vbar('index',
@@ -248,12 +298,10 @@ class Figure(object):
 
             self._set_single_hover_renderer(renderer)
 
-            hover_target = None if self._scheme.merge_data_hovers else self.figure
-            legend_prefix = "" if not self._is_multidata or not self._scheme.merge_data_hovers else f"{title}/"
-            self._hoverc.add_hovertip(f"{legend_prefix}Open", f"@{source_id}open{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip(f"{legend_prefix}High", f"@{source_id}high{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip(f"{legend_prefix}Low", f"@{source_id}low{{{self._scheme.number_format}}}", hover_target)
-            self._hoverc.add_hovertip(f"{legend_prefix}Close", f"@{source_id}close{{{self._scheme.number_format}}}", hover_target)
+            self._hoverc.add_hovertip("Open", f"@{source_id}open{{{self._scheme.number_format}}}", data)
+            self._hoverc.add_hovertip("High", f"@{source_id}high{{{self._scheme.number_format}}}", data)
+            self._hoverc.add_hovertip("Low", f"@{source_id}low{{{self._scheme.number_format}}}", data)
+            self._hoverc.add_hovertip("Close", f"@{source_id}close{{{self._scheme.number_format}}}", data)
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
@@ -307,8 +355,7 @@ class Figure(object):
 
         self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}volume_colors', line_color="black", **kwargs)
 
-        hover_target = None if self._scheme.merge_data_hovers else self.figure
-        self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", hover_target)
+        self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 
     def plot_observer(self, obj, master):
         self._plot_indicator_observer(obj, master)
@@ -423,16 +470,7 @@ class Figure(object):
             hover_label_suffix = f" - {linealias}" if obj.size() > 1 else ""  # we need no suffix if there is just one line in the indicator anyway
             hover_label = indlabel + hover_label_suffix
             hover_data = f"@{source_id}{{{self._scheme.number_format}}}"
-            if not self._scheme.merge_data_hovers:
-                # add hover tooltip for indicators/observers's data
-                self._hoverc.add_hovertip_for_data(hover_label, hover_data, obj._clock)
-            else:
-                hover_target = None
-                is_obs = isinstance(obj, bt.Observer)
-                if is_obs and master is None:
-                    hover_target = self.figure
-                # add hover tooltip for all figures
-                self._hoverc.add_hovertip(hover_label, hover_data, hover_target)
+            self._hoverc.add_hovertip(hover_label, hover_data, obj)
 
             # adapt y-axis if needed
             if master is None or getattr(master.plotinfo, 'plotylimited', False) is False:

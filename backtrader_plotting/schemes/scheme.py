@@ -9,9 +9,9 @@ class Scheme(_BtPlotScheme):
         hover tooltips of datas will contain all other datas and all indicators/observers
         if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data
         """
-        self.merge_data_hovers = True
         self.tabs = 'single'
         self.show_headline = True
+        self.hover_tooltip_config = ''
 
         self.barup_wick = self.barup
         self.bardown_wick = self.bardown

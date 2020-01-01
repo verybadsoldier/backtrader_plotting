@@ -86,13 +86,13 @@ def _get_observers(strategy: bt.Strategy) -> str:
 def get_metadata_div(strategy: bt.Strategy) -> str:
     md = ""
 
-    md += _get_datas(strategy)
+    md += _get_strategy(strategy)
     md += '* * *'
-    md += _get_analyzers(strategy)
+    md += _get_datas(strategy)
     md += '* * *'
     md += _get_observers(strategy)
     md += '* * *'
-    md += _get_strategy(strategy)
+    md += _get_analyzers(strategy)
     md += '* * *'
 
     css_classes = {'table': 'metaDataTable'}

@@ -241,7 +241,7 @@ class Bokeh(metaclass=bt.MetaParams):
         start, end = Bokeh._get_start_end(strategy, start, end)
 
         # reset hover container to not mix hovers with other strategies
-        hoverc = HoverContainer()
+        hoverc = HoverContainer(hover_tooltip_config=self.p.scheme.hover_tooltip_config, is_multidata=len(strategy.datas) > 1)
 
         strat_figures = []
         for master, slaves in data_graph.items():
@@ -277,7 +277,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # volume graphs
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, False, len(strategy.datas) > 1)
+            figure = Figure(strategy, self._figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, len(strategy.datas) > 1)
             figure.plot_volume(v, strat_clk, 1.0)
             self._figurepage.figures.append(figure)
 

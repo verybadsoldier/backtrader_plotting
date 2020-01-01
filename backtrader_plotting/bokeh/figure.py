@@ -58,7 +58,11 @@ class HoverContainer(metaclass=bt.MetaParams):
             foreign = False
             if not apply and (isinstance(src_obj, bt.Observer) or isinstance(src_obj, bt.Indicator)) and src_obj.plotinfo.subplot is False:
                 # add objects that are on the same figure cause subplot is False (for Indicators and Observers)
-                apply = src_obj._clock is fig.master
+                # if plotmaster is set then it will decide where to add, otherwise clock is used
+                if src_obj.plotinfo.plotmaster is not None:
+                    apply = src_obj.plotinfo.plotmaster is fig.master
+                else:
+                    apply = src_obj._clock is fig.master
             if not apply:
                 for c in self._config:
                     if isinstance(src_obj, c[0]) and isinstance(fig.master, c[1]):

@@ -44,8 +44,13 @@ if __name__ == '__main__':
 
     optres = cerebro.run(optreturn=False)
 
-    ordered_result = OrderedOptResult(optres, "Profit & Losss", lambda analysises: sum([x.pnl.gross.total if 'pnl' in x else 0 for x in analysises]))
+    def df(optresults):
+        a = [x.analyzers.tradeanalyzer.get_analysis() for x in optresults]
+        return sum([x.pnl.gross.total if 'pnl' in x else 0 for x in a])
+
+    usercolumns = {'Profit & Loss': df}
 
     b = Bokeh(style='bar', scheme=Tradimo())
-    browser = OptBrowser(b, ordered_result)
+    browser = OptBrowser(b, optres, usercolumns=usercolumns, sortcolumn='Profit & Loss', sortasc=False)
+
     browser.start()

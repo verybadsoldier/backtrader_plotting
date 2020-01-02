@@ -15,7 +15,7 @@ setuptools.setup(
     python_requires='>=3.6',
 
     author='verybadsolider',
-    author_email='svbs@springrts.de',
+    author_email='vbs@springrts.de',
 
     long_description=long_description,
     long_description_content_type="text/markdown",

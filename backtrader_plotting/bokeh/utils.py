@@ -1,12 +1,8 @@
-from typing import Union
-
-from backtrader_plotting import bttypes
-
 from jinja2 import Environment, PackageLoader
-import backtrader
+
 import matplotlib.colors
+
 from backtrader_plotting.utils import nanfilt
-import backtrader as bt
 
 
 def convert_color(color):
@@ -42,7 +38,7 @@ _style_mpl2bokeh = {
 
 def convert_linestyle(style: str) -> str:
     """Converts a backtrader/matplotlib style string to bokeh style string"""
-    return _style_mpl2bokeh[style];
+    return _style_mpl2bokeh[style]
 
 
 def adapt_yranges(y_range, data_min, data_max=None):
@@ -84,11 +80,5 @@ def generate_stylesheet(scheme, template="basic.css.j2") -> str:
                              headline_color=scheme.plot_title_text_color,
                              text_color=scheme.text_color,
                            )
-                      )
+                       )
     return css
-
-
-def get_limited_optresult(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult], num_item_limit=None):
-    if num_item_limit is None:
-        return optresult
-    return optresult[0:num_item_limit]

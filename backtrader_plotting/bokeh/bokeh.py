@@ -25,7 +25,6 @@ from jinja2 import Environment, PackageLoader
 from backtrader_plotting.bokeh.utils import generate_stylesheet
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.utils import find_by_plotid
-from backtrader_plotting import bttypes
 from backtrader_plotting.bokeh.figure import Figure, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
@@ -45,7 +44,7 @@ class FigurePage(object):
     def __init__(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self.figures: List[Figure] = []
         self.strategy: Optional[bt.Strategy] = obj if isinstance(obj, bt.Strategy) else None
-        self.cds: ColumnDataSource = None
+        self.cds: Optional[ColumnDataSource] = None
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
@@ -62,7 +61,7 @@ class Bokeh(metaclass=bt.MetaParams):
         for pname, pvalue in kwargs.items():
             setattr(self.p.scheme, pname, pvalue)
 
-        self._iplot: bool = None
+        self._iplot: Optional[bool] = None
         self._tablegen = TableGenerator(self.p.scheme)
         if not isinstance(self.p.scheme, Scheme):
             raise Exception("Provided scheme has to be a subclass of backtrader_plotting.schemes.scheme.Scheme")
@@ -224,8 +223,6 @@ class Bokeh(metaclass=bt.MetaParams):
         if end < 0:
             end = len(st_dtime) + 1 + end  # -1 =  len() -2 = len() - 1
 
-        # TODO: using a pandas.DataFrame is desired. On bokeh 0.12.13 this failed cause of this issue:
-        # https://github.com/bokeh/bokeh/issues/7400
         strat_clk: array[float] = strategy.lines.datetime.plotrange(start, end)
 
         if self._figurepage.cds is None:
@@ -483,13 +480,4 @@ class Bokeh(metaclass=bt.MetaParams):
     def _reset(self):
         self._figurepages = []
         self._is_optreturn = False
-
-    @staticmethod
-    def _get_opt_count(optresult: Union[bttypes.OptResult, bttypes.OrderedOptResult]):
-        if isinstance(optresult[0], dict):
-            # OrderedOptResult
-            return len(optresult['optresult'][0]['result'])
-        else:
-            # OptResult
-            return len(optresult[0])
     #  endregion

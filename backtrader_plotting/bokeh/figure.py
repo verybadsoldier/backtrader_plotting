@@ -1,7 +1,7 @@
 from array import array
 import collections
 import itertools
-from typing import List, Union
+from typing import List, Optional, Union
 
 import backtrader as bt
 
@@ -102,7 +102,6 @@ class HoverContainer(metaclass=bt.MetaParams):
                 break
 
 
-
 class Figure(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
@@ -114,7 +113,7 @@ class Figure(object):
         self._end = end
         self.figure = None
         self._hover_line_set = False
-        self._hover: HoverTool = None
+        self._hover: Optional[HoverTool] = None
         self._hoverc = hoverc
         self._coloridx = collections.defaultdict(lambda: -1)
         self.master = master
@@ -142,11 +141,11 @@ class Figure(object):
         else:
             self._hover.renderers = [ren]
 
-    def _nextcolor(self, key: object=None) -> None:
+    def _nextcolor(self, key: object = None) -> int:
         self._coloridx[key] += 1
         return self._coloridx[key]
 
-    def _color(self, key: object=None):
+    def _color(self, key: object = None):
         return convert_color(self._scheme.color(self._coloridx[key]))
 
     def _init_figure(self):
@@ -227,7 +226,7 @@ class Figure(object):
 
     def plot(self, obj, strat_clk, master=None):
         if isinstance(obj, bt.AbstractDataBase):
-            self.plot_data(obj, master, strat_clk)
+            self.plot_data(obj, strat_clk)
         elif isinstance(obj, bt.indicator.Indicator):
             self.plot_indicator(obj, master, strat_clk)
         elif isinstance(obj, bt.observers.Observer):
@@ -251,7 +250,7 @@ class Figure(object):
 
         self.datas.append(obj)
 
-    def plot_data(self, data: bt.AbstractDataBase, master, strat_clk: array=None):
+    def plot_data(self, data: bt.AbstractDataBase, strat_clk: array = None):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(label_resolver.datatarget2label([data]))
 

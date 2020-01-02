@@ -1,8 +1,11 @@
-import backtrader as bt
 from collections import OrderedDict
-from bokeh.models import ColumnDataSource, Paragraph, TableColumn, DataTable, DateFormatter, NumberFormatter, StringFormatter, Widget
-from typing import List
+from typing import List, Tuple
 from enum import Enum
+
+import backtrader as bt
+
+from bokeh.models import ColumnDataSource, Paragraph, TableColumn, DataTable, DateFormatter, NumberFormatter, StringFormatter
+
 from ..utils import get_params_str
 
 
@@ -20,7 +23,7 @@ class TableGenerator(object):
         self._cerebtro: bt.Cerebro = cerebro
 
     @staticmethod
-    def _get_analysis_table_generic(analyzer: bt.analyzers.Analyzer) -> List[List[object]]:
+    def _get_analysis_table_generic(analyzer: bt.analyzers.Analyzer) -> Tuple[object, List[object]]:
         """Returns two columns labeled 'Performance' and 'Value'"""
         table = [['Performance', ColummDataType.STRING], ['Value', ColummDataType.STRING]]
 

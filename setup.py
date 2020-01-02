@@ -15,15 +15,21 @@ setuptools.setup(
     python_requires='>=3.6',
 
     author='verybadsolider',
-    author_email='vbs@springrts.de',
+    author_email='svbs@springrts.de',
 
     long_description=long_description,
     long_description_content_type="text/markdown",
 
     license='GPLv3+',
+    url="https://github.com/verybadsoldier/backtrader_plotting",
+    project_urls={
+        "Bug Tracker": "https://github.com/verybadsoldier/backtrader_plotting/issues",
+        "Documentation": "https://github.com/verybadsoldier/backtrader_plotting/wiki",
+        "Source Code": "https://github.com/verybadsoldier/backtrader_plotting",
+    },
 
     # What does your project relate to?
-    keywords=['trading', 'development', 'plotting'],
+    keywords=['trading', 'development', 'plotting', 'backtrader'],
 
     packages=setuptools.find_packages(),
     

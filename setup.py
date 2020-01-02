@@ -26,6 +26,7 @@ setuptools.setup(
         "Bug Tracker": "https://github.com/verybadsoldier/backtrader_plotting/issues",
         "Documentation": "https://github.com/verybadsoldier/backtrader_plotting/wiki",
         "Source Code": "https://github.com/verybadsoldier/backtrader_plotting",
+        "Demos": "https://github.com/verybadsoldier/backtrader_plotting/tree/gh-pages",
     },
 
     # What does your project relate to?

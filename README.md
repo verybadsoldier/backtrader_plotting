@@ -1,12 +1,17 @@
 # backtrader_plotting
-Plotting addon for backtrader to support Bokeh (and maybe more).
+Library to add extended plotting capabilities to `backtrader` (https://www.backtrader.com/). Currently the only available backend is `Bokeh` (https://bokeh.org/).
 
-This is in an early development state. Expect bugs, heavy restructuring and commit reordering. 
-Currently this is Python >=3.6 only.
+## Features
+* Interactive plots
+* Interactive `backtrader` optimization result browser (only supported for single-strategy runs)
+* Highly configurable 
+* Different skinnable themes
+* Easy to use
 
-Feel free to test it and play with it. I am happy about feedback, critics and ideas:
+Feel free to test it and play with it. I am happy about feedback, critics and ideas on backtrader forum (and also in GitHub issues):
 https://community.backtrader.com/topic/813/bokeh-integration-interactive-webbrowser-plotting
 
+Needs Python >= 3.6.
 ## Demos
 https://verybadsoldier.github.io/backtrader_plotting/
 
@@ -25,7 +30,9 @@ cerebro.plot(b)
 ## Minimal Example
 ```python
 import datetime
+
 import backtrader as bt
+
 from backtrader_plotting import Bokeh
 
 
@@ -65,19 +72,23 @@ if __name__ == '__main__':
 ```
 
 ## Plotting Optimization Results
-Another way to use this package is to invoke `Bokeh.plot_result`. This function also supports passing a `cerebro` result object as it is generated in optimization:
+Another way to use this package is to use the `OptBrowser` to browse a `backtrader` optimization result:
 
+```python
+...
+cerebro.optstrategy(TestStrategy, buydate=range(1, 10, 1))
+cerebro.addanalyzer(bt.analyzers.SharpeRatio)
+...
+res = cerebro.run()
+bo = Bokeh()
+browser = OptBrowser(bo, result)
+browser.start()
 ```
-    ...
-    cerebro.optstrategy(TestStrategy, buydate=range(1, 10, 1))
-    cerebro.addanalyzer(bt.analyzers.SharpeRatio)
-    ...
-    res = cerebro.run()
-    bo = Bokeh()
-    bo.plot_result(res)
-```
 
-This will start a Bokeh application (standalone webserver) displaying all optimization results.
+This will start a Bokeh application (standalone webserver) displaying all optimization results. Different results can be selected and viewed.
 
-*NOTE:* When using this feature with `optreturn=True` then your package of `backtrader` has to contain this change of mine:
-https://github.com/verybadsoldier/backtrader/commit/f03a0ed115338ed8f074a942f6520b31c630bcfb
+It is possible possible to add further user-provided columns.
+When dealing with huge amounts of optimization results the number of results can be limited and the remaining results can be sorted by a user-provided function to allow for simple selection of the best results.
+
+## Documentation
+Please refert to the Wiki for further documentation: https://github.com/verybadsoldier/backtrader_plotting/wiki

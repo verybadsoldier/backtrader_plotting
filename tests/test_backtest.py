@@ -3,9 +3,7 @@ import datetime
 import pytest
 
 import backtrader_plotting.bokeh.bokeh
-from backtrader_plotting import Bokeh
-from backtrader_plotting.bokeh.optbrowser import OptBrowser
-from backtrader_plotting.bttypes import OrderedOptResult
+from backtrader_plotting import Bokeh, OptBrowser
 
 from tests.strategies.togglestrategy import ToggleStrategy
 from tests.asserts.asserts import assert_num_tabs, assert_num_figures
@@ -217,11 +215,17 @@ def test_ordered_optimize(cerebro: bt.Cerebro):
     cerebro.optstrategy(bt.strategies.MA_CrossOver, slow=[20], fast=[5, 10, 20])
     res = cerebro.run(optreturn=True)
 
-    ordered_result = OrderedOptResult(res, "Profit & Losss", lambda analysises: sum([x.pnl.gross.total if 'pnl' in x else 0 for x in analysises]))
+    def df(optresults):
+        a = [x.analyzers.tradeanalyzer.get_analysis() for x in optresults]
+        return sum([x.pnl.gross.total if 'pnl' in x else 0 for x in a])
+
+    usercolumns = {
+        'Profit & Loss': df,
+    }
 
     b = Bokeh(style='bar', output_mode=_output_mode)
 
-    browser = OptBrowser(b, ordered_result)
+    browser = OptBrowser(b, res, usercolumns=usercolumns, sortcolumn='Profit & Loss')
     model = browser._build_optresult_model()
     # browser.start()
 

@@ -1,5 +1,7 @@
 import datetime
+
 import backtrader as bt
+
 from backtrader_plotting import Bokeh
 
 

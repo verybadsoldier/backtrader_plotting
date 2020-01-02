@@ -1,8 +1,10 @@
 import datetime
+
 import backtrader as bt
-from backtrader_plotting import Bokeh
+
+from backtrader_plotting import Bokeh, OptBrowser
+
 from backtrader_plotting.schemes import Tradimo
-from backtrader_plotting.bttypes import OrderedOptResult
 
 
 class MyStrategy(bt.Strategy):
@@ -42,14 +44,8 @@ if __name__ == '__main__':
 
     optres = cerebro.run(optreturn=False)
 
-    def benchmark(optresults):
-        a = [x.analyzers.tradeanalyzer.get_analysis() for x in optresults]
-        return sum([x.pnl.gross.total if 'pnl' in x else 0 for x in a])
-
-    result = [OrderedOptResult.BenchmarkedResult(benchmark(x), x) for x in optres]
-    ordered_result = sorted(result, key=lambda x: x.benchmark, reverse=True)
-
-    ordered_result = OrderedOptResult("Profit & Losss", ordered_result)
+    ordered_result = OrderedOptResult(optres, "Profit & Losss", lambda analysises: sum([x.pnl.gross.total if 'pnl' in x else 0 for x in analysises]))
 
     b = Bokeh(style='bar', scheme=Tradimo())
-    b.plot_and_show(ordered_result)
+    browser = OptBrowser(b, ordered_result)
+    browser.start()

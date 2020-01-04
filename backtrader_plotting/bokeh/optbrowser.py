@@ -1,46 +1,29 @@
 from collections import defaultdict
-import sys
+import functools
 from typing import Dict, Callable, Tuple
 
 from pandas import DataFrame
 
 from bokeh.models import ColumnDataSource, Model
 from bokeh.layouts import column
-from bokeh.server.server import Server
-from bokeh.document import Document
-from bokeh.application import Application
-from bokeh.application.handlers.function import FunctionHandler
 from bokeh.models.widgets import DataTable, TableColumn, NumberFormatter, StringFormatter
 
 from backtrader_plotting import Bokeh
-from backtrader_plotting.bokeh import utils
-
-from jinja2 import Environment, PackageLoader
+from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
 
 
 class OptBrowser:
     def __init__(self, bokeh: Bokeh, optresults, usercolumns: Dict[str, Callable] = None, num_result_limit=None, sortcolumn=None, sortasc=True):
         self._usercolumns = {} if usercolumns is None else usercolumns
         self._num_result_limit = num_result_limit
-        self._optresults = optresults
         self._bokeh: Bokeh = bokeh
         self._sortcolumn = sortcolumn
         self._sortasc = sortasc
+        self._optresults = optresults
 
     def start(self, ioloop=None):
-        """Serves an optimization resulst as a Bokeh application running on a web server"""
-        def make_document(doc: Document):
-            doc.title = "Backtrader Optimization Result"
-
-            env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
-            doc.template = env.get_template("basic.html.j2")
-
-            doc.template_variables['stylesheet'] = utils.generate_stylesheet(self._bokeh.params.scheme)
-
-            model = self._build_optresult_model()
-            doc.add_root(model)
-
-        self._run_server(make_document, ioloop=ioloop)
+        webapp = BokehWebapp("Backtrader Optimization Result", "basic.html.j2", self._bokeh.params.scheme, self.build_optresult_model)
+        webapp.start(ioloop)
 
     def _build_optresult_selector(self, optresults) -> Tuple[DataTable, ColumnDataSource]:
         # 1. build a dict with all params and all user columns
@@ -78,7 +61,7 @@ class OptBrowser:
         selector = DataTable(source=cds, columns=tab_columns, width=1600, height=150)
         return selector, cds
 
-    def _build_optresult_model(self) -> Model:
+    def build_optresult_model(self) -> Model:
         """Generates and returns an interactive model for an OptResult or an OrderedOptResult"""
 
         # we have list of results, each result contains the result for one strategy. we don't support having more than one strategy!
@@ -104,17 +87,3 @@ class OptBrowser:
         selector_cds.selected.on_change('indices', update)
 
         return model
-
-    @staticmethod
-    def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):
-        """Runs a Bokeh webserver application. Documents will be created using fnc_make_document"""
-        handler = FunctionHandler(fnc_make_document)
-        app = Application(handler)
-        if iplot and 'ipykernel' in sys.modules:
-            show(app, notebook_url=notebook_url)
-        else:
-            apps = {'/': app}
-
-            print("Open your browser here: http://localhost")
-            server = Server(apps, port=port, io_loop=ioloop)
-            server.run_until_shutdown()

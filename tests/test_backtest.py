@@ -157,7 +157,7 @@ def test_optimize(cerebro: bt.Cerebro):
     b = Bokeh(style='bar', output_mode=_output_mode)
 
     browser = OptBrowser(b, res)
-    model = browser._build_optresult_model()
+    model = browser.build_optresult_model()
     # browser.start()
 
     def count_children(obj):
@@ -183,7 +183,7 @@ def test_optimize_2strat(cerebro: bt.Cerebro):
     browser = OptBrowser(b, res)
 
     with pytest.raises(RuntimeError):
-        browser._build_optresult_model()
+        browser.build_optresult_model()
     # browser.start()
 
 
@@ -195,7 +195,7 @@ def test_optimize_no_optreturn(cerebro_no_optreturn: bt.Cerebro):
     b = Bokeh(style='bar', output_mode=_output_mode, scheme=s)
 
     browser = OptBrowser(b, res)
-    model = browser._build_optresult_model()
+    model = browser.build_optresult_model()
     #browser.start()
 
     def count_children(obj):
@@ -226,7 +226,7 @@ def test_ordered_optimize(cerebro: bt.Cerebro):
     b = Bokeh(style='bar', output_mode=_output_mode)
 
     browser = OptBrowser(b, res, usercolumns=usercolumns, sortcolumn='Profit & Loss')
-    model = browser._build_optresult_model()
+    model = browser.build_optresult_model()
     # browser.start()
 
     def count_children(obj):

@@ -69,17 +69,20 @@ def resample_line(line, line_clk, new_clk):
     return new_line
 
 
-def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime=None, end: datetime=None, name_prefix: str="") -> pandas.DataFrame:
+def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "") -> pandas.DataFrame:
     df = pandas.DataFrame()
+
+    # iterate all lines
     for lineidx in range(obj.size()):
         line = obj.lines[lineidx]
         linealias = obj.lines._getlinealias(lineidx)
         if linealias == 'datetime':
             continue
+
+        # get data limited to time range
         data = line.plotrange(start, end)
 
         ndata = resample_line(data, obj.lines.datetime.plotrange(start, end), strat_clk)
-        logging.info(f"Filled_line: {linealias}: {str(ndata)}")
 
         df[name_prefix + linealias] = ndata
 

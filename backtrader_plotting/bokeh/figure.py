@@ -283,7 +283,7 @@ class Figure(object):
                 self._nextcolor(data.plotinfo.plotmaster)
                 color = convert_color(self._color(data.plotinfo.plotmaster))
 
-            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend=title)
+            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend_label=title)
             self._set_single_hover_renderer(renderer)
 
             self._hoverc.add_hovertip("Close", f"@{source_id}close", data)

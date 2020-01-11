@@ -11,11 +11,12 @@ from backtrader_plotting.bokeh import utils
 
 
 class BokehWebapp:
-    def __init__(self, title, html_template, scheme, model_fnc):
+    def __init__(self, title, html_template, scheme, model_fnc, port=80):
         self._title = title
         self._html_template = html_template
         self._scheme = scheme
         self._model_fnc = model_fnc
+        self._port = port
 
     def start(self, ioloop=None):
         """Serves a backtrader result as a Bokeh application running on a web server"""
@@ -30,7 +31,7 @@ class BokehWebapp:
             model = self._model_fnc()
             doc.add_root(model)
 
-        self._run_server(make_document, ioloop=ioloop)
+        self._run_server(make_document, ioloop=ioloop, port=self._port)
 
     @staticmethod
     def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):

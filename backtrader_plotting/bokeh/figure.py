@@ -373,6 +373,7 @@ class Figure(object):
         indlabel = obj.plotlabel()
         plotinfo = obj.plotinfo
 
+        is_multiline = obj.size() > 1
         for lineidx in range(obj.size()):
             line = obj.lines[lineidx]
             source_id = Figure._source_id(line)
@@ -405,11 +406,10 @@ class Figure(object):
             dataline = resample_line(dataline, line_clk, strat_clk)
             self._add_to_cds(dataline, source_id)
 
-            label = None
-            if master is None or lineidx == 0 or plotinfo.plotlinelabels:
-                label = indlabel
-                if master is None or plotinfo.plotlinelabels:
-                    label += " " + (lineplotinfo._get("_name", "") or linealias)
+            # either all individual lines of are displayed in the legend or only the ind/obs as a whole
+            label = indlabel
+            if is_multiline and plotinfo.plotlinelabels:
+                label += " " + (lineplotinfo._get("_name", "") or linealias)
             kwglyphs['legend_label'] = label
 
             if marker is not None:

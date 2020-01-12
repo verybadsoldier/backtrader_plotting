@@ -3,6 +3,8 @@ import backtrader as bt
 import backtrader_plotting
 from backtrader_plotting.schemes import Tradimo
 
+from testcommon import getdatadir
+
 
 class MyStrategy(bt.Strategy):
     def __init__(self):
@@ -24,7 +26,7 @@ def test_github_issue30():
     cerebro.addstrategy(MyStrategy)
 
     data = bt.feeds.YahooFinanceCSVData(
-        dataname="datas/orcl-1995-2014.txt",
+        dataname=getdatadir("orcl-1995-2014.txt"),
         fromdate=datetime.datetime(2000, 1, 1),
         todate=datetime.datetime(2001, 2, 28),
         reverse=False,

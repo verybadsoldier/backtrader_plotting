@@ -2,7 +2,11 @@ import datetime  # For datetime objects
 
 # Import the backtrader platform
 import backtrader as bt
+
 import backtrader_plotting
+
+from testcommon import getdatadir
+
 
 # Create a Stratey
 class MACDStrategy(bt.Strategy):
@@ -97,7 +101,7 @@ def bokeh_plot(data):
 
 def test_github_issue10():
     data = bt.feeds.YahooFinanceCSVData(
-        dataname="./datas/orcl-1995-2014.txt",
+        dataname=getdatadir("orcl-1995-2014.txt"),
         fromdate=datetime.datetime(2000, 1, 1),
         todate=datetime.datetime(2001, 2, 28),
     )

@@ -5,3 +5,4 @@ backtrader_plotting.egg-info
 /tests/.pytest_cache
 /.idea
 /.pytest_cache
+/.tox

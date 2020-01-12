@@ -4,8 +4,8 @@ python:
   - "3.7"
   - "3.8"
   - "3.8-dev"
-  - "nightly"
+  # - "nightly"
 
-script:
-  - cd tests
-  - pytest
+install: pip install tox-travis
+
+script: tox

@@ -5,8 +5,9 @@ import pytest
 import backtrader_plotting.bokeh.bokeh
 from backtrader_plotting import Bokeh, OptBrowser
 
-from tests.strategies.togglestrategy import ToggleStrategy
-from tests.asserts.asserts import assert_num_tabs, assert_num_figures
+from strategies.togglestrategy import ToggleStrategy
+from asserts.asserts import assert_num_tabs, assert_num_figures
+from testcommon import getdatadir
 
 # set to 'show' for debugging
 _output_mode = 'memory'
@@ -16,7 +17,7 @@ _output_mode = 'memory'
 def cerebro() -> bt.Cerebro:
     cerebro = bt.Cerebro()
 
-    datapath = 'datas/orcl-1995-2014.txt'
+    datapath = getdatadir('orcl-1995-2014.txt')
     data = bt.feeds.YahooFinanceCSVData(
         dataname=datapath,
         fromdate=datetime.datetime(1998, 1, 1),
@@ -37,7 +38,7 @@ def cerebro() -> bt.Cerebro:
 def cerebro_no_optreturn() -> bt.Cerebro:
     cerebro = bt.Cerebro(optreturn=False)
 
-    datapath = 'datas/orcl-1995-2014.txt'
+    datapath = getdatadir('orcl-1995-2014.txt')
     data = bt.feeds.YahooFinanceCSVData(
         dataname=datapath,
         fromdate=datetime.datetime(1998, 1, 1),
@@ -82,7 +83,7 @@ def test_std_backtest(cerebro: bt.Cerebro):
 
 
 def test_std_backtest_2datas(cerebro: bt.Cerebro):
-    datapath = 'datas/nvda-1999-2014.txt'
+    datapath = getdatadir('nvda-1999-2014.txt')
     data = bt.feeds.YahooFinanceCSVData(
         dataname=datapath,
         fromdate=datetime.datetime(1998, 1, 1),

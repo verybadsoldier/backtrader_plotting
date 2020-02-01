@@ -10,7 +10,7 @@ from asserts.asserts import assert_num_tabs, assert_num_figures
 from testcommon import getdatadir
 
 # set to 'show' for debugging
-_output_mode = 'memory'
+_output_mode = 'show'
 
 
 @pytest.fixture

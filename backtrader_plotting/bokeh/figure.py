@@ -1,9 +1,13 @@
 from array import array
 import collections
 import itertools
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
+
+import numpy as np
 
 import backtrader as bt
+
+import pandas as pd
 
 from bokeh.models import Span
 from bokeh.plotting import figure
@@ -14,8 +18,8 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.utils import resample_line, convert_to_pandas, nanfilt, get_data_obj
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
+from backtrader_plotting.utils import convert_to_pandas, nanfilt, get_data_obj
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
 
 
 class HoverContainer(metaclass=bt.MetaParams):
@@ -224,11 +228,11 @@ class Figure(object):
         self._hover = h
         self.figure = f
 
-    def plot(self, obj, strat_clk, master=None):
+    def plot(self, obj, master=None):
         if isinstance(obj, bt.AbstractDataBase):
-            self.plot_data(obj, strat_clk)
+            self.plot_data(obj)
         elif isinstance(obj, bt.indicator.Indicator):
-            self.plot_indicator(obj, master, strat_clk)
+            self.plot_indicator(obj, master)
         elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj, master)
         else:
@@ -250,31 +254,42 @@ class Figure(object):
 
         self.datas.append(obj)
 
-    def plot_data(self, data: bt.AbstractDataBase, strat_clk: array = None):
+    @staticmethod
+    def build_color_lines(df: pd.DataFrame, scheme, col_open: str = 'open', col_close: str = 'close', col_prefix: str='') -> pd.DataFrame:
+        # build color strings from scheme
+        colorup = convert_color(scheme.barup)
+        colordown = convert_color(scheme.bardown)
+        colorup_wick = convert_color(scheme.barup_wick)
+        colordown_wick = convert_color(scheme.bardown_wick)
+        colorup_outline = convert_color(scheme.barup_outline)
+        colordown_outline = convert_color(scheme.bardown_outline)
+
+        # build binary series determining if up or down bar
+        is_up = df[col_close] > df[col_open]
+
+        df = pd.DataFrame()
+        df[col_prefix + 'colors_bars'] = [colorup if x else colordown for x in is_up]
+        df[col_prefix + 'colors_wicks'] = [colorup_wick if x else colordown_wick for x in is_up]
+        df[col_prefix + 'colors_outline'] = [colorup_outline if x else colordown_outline for x in is_up]
+        df[col_prefix + 'colors_volume'] = [colorup if x else colordown for x in is_up]
+
+        return df
+
+    def _add_column(self, name, dtype):
+        self._add_columns([(name, dtype)])
+
+    def _add_columns(self, cols: List[Tuple[str, object]]):
+        for name, dtype in cols:
+            self._cds.add(np.array([], dtype=dtype), name)
+
+    def plot_data(self, data: bt.AbstractDataBase):
         source_id = Figure._source_id(data)
         title = sanitize_source_name(label_resolver.datatarget2label([data]))
 
         # append to title
         self._figure_append_title(title)
 
-        df = convert_to_pandas(strat_clk, data, self._start, self._end)
-
-        # configure colors
-        colorup = convert_color(self._scheme.barup)
-        colordown = convert_color(self._scheme.bardown)
-        colorup_wick = convert_color(self._scheme.barup_wick)
-        colordown_wick = convert_color(self._scheme.bardown_wick)
-        colorup_outline = convert_color(self._scheme.barup_outline)
-        colordown_outline = convert_color(self._scheme.bardown_outline)
-        is_up = df.close > df.open
-
-        self._add_to_cds(df.open, source_id + 'open')
-        self._add_to_cds(df.high, source_id + 'high')
-        self._add_to_cds(df.low, source_id + 'low')
-        self._add_to_cds(df.close, source_id + 'close')
-        self._add_to_cds([colorup if x else colordown for x in is_up], source_id + 'colors_bars')
-        self._add_to_cds([colorup_wick if x else colordown_wick for x in is_up], source_id + 'colors_wicks')
-        self._add_to_cds([colorup_outline if x else colordown_outline for x in is_up], source_id + 'colors_outline')
+        self._add_columns([(source_id + x, object) for x in ['open', 'high', 'low', 'close', 'colors_bars', 'colors_wicks', 'colors_outline']])
 
         if self._scheme.style == 'line':
             if data.plotinfo.plotmaster is None:
@@ -308,30 +323,15 @@ class Figure(object):
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
-        adapt_yranges(self.figure.y_range, df.low, df.high)
-
         # check if we have to plot volume overlay
         if self._scheme.volume and self._scheme.voloverlay:
-            self.plot_volume(data, strat_clk, self._scheme.voltrans, True)
+            self.plot_volume(data, self._scheme.voltrans, True)
 
-    def plot_volume(self, data: bt.AbstractDataBase, strat_clk: array, alpha, extra_axis=False):
+    def plot_volume(self, data: bt.AbstractDataBase, alpha, extra_axis=False):
         """extra_axis displays a second axis (for overlay on data plotting)"""
         source_id = Figure._source_id(data)
 
-        df = convert_to_pandas(strat_clk, data, self._start, self._end)
-
-        if len(nanfilt(df.volume)) == 0:
-            return
-
-        colorup = convert_color(self._scheme.volup)
-        colordown = convert_color(self._scheme.voldown)
-
-        is_up = df.close > df.open
-        colors = [colorup if x else colordown for x in is_up]
-
-        self._add_to_cds(df.volume, f'{source_id}volume')
-        self._add_to_cds(colors, f'{source_id}volume_colors')
-
+        self._add_columns([(source_id + 'volume', np.float64), (source_id + 'colors_volume', np.float64)])
         kwargs = {'fill_alpha': alpha,
                   'line_alpha': alpha,
                   'name': 'Volume',
@@ -340,11 +340,11 @@ class Figure(object):
         ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
 
         if extra_axis:
-            self.figure.extra_y_ranges = {'axvol': DataRange1d()}
-            adapt_yranges(self.figure.extra_y_ranges['axvol'], df.volume)
-            self.figure.extra_y_ranges['axvol'].end /= self._scheme.volscaling
+            self.figure.extra_y_ranges = {'axvol': DataRange1d(start=0, range_padding=10)}
+            #self.figure.extra_y_ranges['axvol'].end /= self._scheme.volscaling
 
-            ax_color = colorup
+            # use colorup
+            ax_color = convert_color(self._scheme.volup)
 
             ax = LinearAxis(y_range_name="axvol", formatter=ax_formatter,
                             axis_label_text_color=ax_color, axis_line_color=ax_color, major_label_text_color=ax_color,
@@ -353,20 +353,18 @@ class Figure(object):
             kwargs['y_range_name'] = "axvol"
         else:
             self.figure.yaxis.formatter = ax_formatter
-            adapt_yranges(self.figure.y_range, df.volume)
-            self.figure.y_range.end /= self._scheme.volscaling
 
-        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}volume_colors', line_color="black", **kwargs)
+        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
 
         self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 
     def plot_observer(self, obj, master):
         self._plot_indicator_observer(obj, master)
 
-    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array = None):
-        self._plot_indicator_observer(obj, master, strat_clk)
+    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
+        self._plot_indicator_observer(obj, master)
 
-    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer], master, strat_clk: array = None):
+    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer], master):
         pl = plotobj2label(obj)
 
         self._figure_append_title(pl)
@@ -401,10 +399,7 @@ class Figure(object):
 
             kwglyphs = {'name': linealias}
 
-            dataline = line.plotrange(self._start, self._end)
-            line_clk = get_data_obj(obj).lines.datetime.plotrange(self._start, self._end)
-            dataline = resample_line(dataline, line_clk, strat_clk)
-            self._add_to_cds(dataline, source_id)
+            self._add_column(source_id, np.float64)
 
             # either all individual lines of are displayed in the legend or only the ind/obs as a whole
             label = indlabel
@@ -474,10 +469,6 @@ class Figure(object):
             hover_label = indlabel + hover_label_suffix
             hover_data = f"@{source_id}{{{self._scheme.number_format}}}"
             self._hoverc.add_hovertip(hover_label, hover_data, obj)
-
-            # adapt y-axis if needed
-            if master is None or getattr(master.plotinfo, 'plotylimited', False) is False:
-                adapt_yranges(self.figure.y_range, dataline)
 
         self._set_yticks(obj)
         self._plot_hlines(obj)

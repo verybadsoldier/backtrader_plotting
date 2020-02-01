@@ -4,6 +4,8 @@ import matplotlib.colors
 
 from backtrader_plotting.utils import nanfilt
 
+from bokeh.models import ColumnDataSource
+
 
 def convert_color(color):
     """if color is a float value then it is interpreted as a shade of grey and converted to the corresponding html color code"""
@@ -82,3 +84,11 @@ def generate_stylesheet(scheme, template="basic.css.j2") -> str:
                            )
                        )
     return css
+
+
+def append_cds(base_cds: ColumnDataSource, new_cds: ColumnDataSource):
+    for c in new_cds.keys():
+        if c not in base_cds.column_names:
+            continue
+        base_cds.data[c] = new_cds[c]
+

@@ -1,7 +1,4 @@
-try:
-    from backtrader_plotting.bokeh.bokeh import Bokeh
-except ImportError as e:
-    pass
+from backtrader_plotting.bokeh.bokeh import Bokeh
 
 from backtrader_plotting.bokeh.optbrowser import OptBrowser
 

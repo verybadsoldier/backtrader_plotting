@@ -49,8 +49,9 @@ def nanfilt(x: List) -> List:
     return [value for value in x if not math.isnan(value)]
 
 
-def resample_line(line, line_clk, new_clk):
-    """Resamples data line to a new clock. Missing values will be filled with NaN."""
+def convert_by_line_clock(line, line_clk, new_clk):
+    """Takes a clock and generates an appropriate line with a value for each entry in clock. Values are taken from another line if the
+    clock value in question is found in its line_clk. Otherwise NaN is used"""
     if new_clk is None:
         return line
 
@@ -69,9 +70,10 @@ def resample_line(line, line_clk, new_clk):
     return new_line
 
 
-def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "") -> pandas.DataFrame:
-    df = pandas.DataFrame()
+def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pandas.DataFrame:
+    lines_clk = obj.lines.datetime.plotrange(start, end)
 
+    df = pandas.DataFrame()
     # iterate all lines
     for lineidx in range(obj.size()):
         line = obj.lines[lineidx]
@@ -82,10 +84,11 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
         # get data limited to time range
         data = line.plotrange(start, end)
 
-        ndata = resample_line(data, obj.lines.datetime.plotrange(start, end), strat_clk)
+        ndata = convert_by_line_clock(data, lines_clk, strat_clk)
 
         df[name_prefix + linealias] = ndata
 
+    df[name_prefix + 'volume'] = 10000;
     df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
     return df
 

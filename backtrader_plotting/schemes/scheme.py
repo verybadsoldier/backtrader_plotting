@@ -75,3 +75,5 @@ class Scheme(_BtPlotScheme):
         self.axis_tickformat_days = "%d %b %R"
         self.axis_tickformat_months = "%D"
         self.axis_tickformat_years = "%Y %b"
+
+        self.y_range_padding = 0.5  # used to add padding on the y-axis for all data except volume

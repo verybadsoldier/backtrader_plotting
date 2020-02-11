@@ -43,14 +43,15 @@ def convert_linestyle(style: str) -> str:
     return _style_mpl2bokeh[style]
 
 
-def adapt_yranges(y_range, data_min, data_max=None):
-    dmin = min(nanfilt(data_min), default=None)
-    dmax = max(nanfilt(data_max if data_max is not None else data_min), default=None)
+def adapt_yranges(y_range, data, padding_factor=200.0):
+    nnan_data = nanfilt(data)
+    dmin = min(nnan_data, default=None)
+    dmax = max(nnan_data, default=None)
 
     if dmin is None or dmax is None:
         return
 
-    diff = ((dmax - dmin) or dmin) * 0.1
+    diff = ((dmax - dmin) or dmin) * padding_factor
     dmin -= diff
     dmax += diff
 

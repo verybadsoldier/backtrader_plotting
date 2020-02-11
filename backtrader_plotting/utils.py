@@ -58,7 +58,7 @@ def convert_by_line_clock(line, line_clk, new_clk):
     new_line = []
     next_idx = len(line_clk) - 1
     for sc in new_clk:
-        for i in range(next_idx, 0, -1):
+        for i in range(next_idx, -1, -1):  # run from next_idx to -1 (-1 so we actually also catch index 0!)
             v = line_clk[-i]
             if sc == v:
                 # exact hit
@@ -88,7 +88,6 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
 
         df[name_prefix + linealias] = ndata
 
-    df[name_prefix + 'volume'] = 10000;
     df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
     return df
 

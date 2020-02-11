@@ -1,7 +1,7 @@
 from array import array
 import collections
 import itertools
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -19,7 +19,7 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.utils import convert_to_pandas, nanfilt, get_data_obj
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 
 
 class HoverContainer(metaclass=bt.MetaParams):
@@ -115,7 +115,7 @@ class Figure(object):
         self._scheme = scheme
         self._start = start
         self._end = end
-        self.figure = None
+        self.figure: figure = None
         self._hover_line_set = False
         self._hover: Optional[HoverTool] = None
         self._hoverc = hoverc
@@ -157,6 +157,8 @@ class Figure(object):
         f = figure(tools=Figure._tools, x_axis_type='linear', aspect_ratio=self._scheme.plot_aspect_ratio)
         # TODO: backend webgl (output_backend="webgl") removed due to this bug:
         # https://github.com/bokeh/bokeh/issues/7568
+
+        f.y_range.range_padding = self._scheme.y_range_padding
 
         f.border_fill_color = convert_color(self._scheme.border_fill)
 
@@ -263,16 +265,17 @@ class Figure(object):
         colordown_wick = convert_color(scheme.bardown_wick)
         colorup_outline = convert_color(scheme.barup_outline)
         colordown_outline = convert_color(scheme.bardown_outline)
+        volup = convert_color(scheme.volup)
+        voldown = convert_color(scheme.voldown)
 
         # build binary series determining if up or down bar
-        is_up = df[col_close] > df[col_open]
+        is_up: pd.DataFrame = df[col_close] > df[col_open]
 
         df = pd.DataFrame()
         df[col_prefix + 'colors_bars'] = [colorup if x else colordown for x in is_up]
         df[col_prefix + 'colors_wicks'] = [colorup_wick if x else colordown_wick for x in is_up]
         df[col_prefix + 'colors_outline'] = [colorup_outline if x else colordown_outline for x in is_up]
-        df[col_prefix + 'colors_volume'] = [colorup if x else colordown for x in is_up]
-
+        df[col_prefix + 'colors_volume'] = [volup if x else voldown for x in is_up]
         return df
 
     def _add_column(self, name, dtype):
@@ -323,15 +326,17 @@ class Figure(object):
         else:
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
-        # check if we have to plot volume overlay
+        # make sure the regular y-axis only scales to the normal data on 1st axis (not to e.g. volume data on 2nd axis)
+        self.figure.y_range.renderers.append(renderer)
+
         if self._scheme.volume and self._scheme.voloverlay:
             self.plot_volume(data, self._scheme.voltrans, True)
 
-    def plot_volume(self, data: bt.AbstractDataBase, alpha, extra_axis=False):
+    def plot_volume(self, data: bt.AbstractDataBase, alpha=1.0, extra_axis=False):
         """extra_axis displays a second axis (for overlay on data plotting)"""
         source_id = Figure._source_id(data)
 
-        self._add_columns([(source_id + 'volume', np.float64), (source_id + 'colors_volume', np.float64)])
+        self._add_columns([(source_id + 'volume', np.float64), (source_id + 'colors_volume', np.object)])
         kwargs = {'fill_alpha': alpha,
                   'line_alpha': alpha,
                   'name': 'Volume',
@@ -339,22 +344,30 @@ class Figure(object):
 
         ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
 
+        source_data_axis = None
         if extra_axis:
-            self.figure.extra_y_ranges = {'axvol': DataRange1d(start=0, range_padding=10)}
-            #self.figure.extra_y_ranges['axvol'].end /= self._scheme.volscaling
+            source_data_axis = 'axvol'
+
+            self.figure.extra_y_ranges = {source_data_axis: DataRange1d(
+                range_padding=1.0/self._scheme.volscaling,
+                start=0,
+            )}
 
             # use colorup
             ax_color = convert_color(self._scheme.volup)
 
-            ax = LinearAxis(y_range_name="axvol", formatter=ax_formatter,
+            ax = LinearAxis(y_range_name=source_data_axis, formatter=ax_formatter,
                             axis_label_text_color=ax_color, axis_line_color=ax_color, major_label_text_color=ax_color,
                             major_tick_line_color=ax_color, minor_tick_line_color=ax_color)
             self.figure.add_layout(ax, 'left')
-            kwargs['y_range_name'] = "axvol"
+            kwargs['y_range_name'] = source_data_axis
         else:
             self.figure.yaxis.formatter = ax_formatter
 
-        self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
+        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
+
+        # make sure the new axis only auto-scale to the volume data
+        self.figure.extra_y_ranges['axvol'].renderers = [vbars]
 
         self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 
@@ -458,6 +471,9 @@ class Figure(object):
                 raise Exception(f"Unknown plotting method '{method}'")
 
             renderer = glyph_fnc("index", source=self._cds, **kwglyphs)
+
+            # make sure the regular y-axis only scales to the normal data (data + ind/obs) on 1st axis (not to e.g. volume data on 2nd axis)
+            self.figure.y_range.renderers.append(renderer)
 
             # for markers add additional renderer so hover pops up for all of them
             if marker is None:

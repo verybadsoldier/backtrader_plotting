@@ -253,7 +253,7 @@ class Bokeh(metaclass=bt.MetaParams):
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
             figure = Figure(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, is_multidata=len(strategy.datas) > 1)
-            figure.plot_volume(v, 1.0)
+            figure.plot_volume(v)
             self._cur_figurepage.figures.append(figure)
 
     def plot_and_generate_optmodel(self, obj: Union[bt.Strategy, bt.OptReturn]):
@@ -443,7 +443,9 @@ class Bokeh(metaclass=bt.MetaParams):
                 line = obj.lines[lineidx]
                 source_id = Figure._source_id(line)
                 dataline = line.plotrange(start, end)
-                line_clk = get_data_obj(obj).lines.datetime.plotrange(start, end)
+
+                line_clk = obj._clock.lines.datetime.plotrange(start, end)
+                #line_clk2 = get_data_obj(obj).lines.datetime.plotrange(start, end)
                 dataline = convert_by_line_clock(dataline, line_clk, strat_clk)
                 stratedata[source_id] = dataline
 

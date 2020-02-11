@@ -8,7 +8,7 @@ from attr import dataclass
 import backtrader as bt
 
 from bokeh.io import curdoc
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, DataRange1d, Range1d
 from bokeh.document import Document
 
 from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
@@ -30,19 +30,20 @@ class PlotListener(bt.ListenerBase):
 
     @dataclass
     class DocDataState:
-        bokeh: Bokeh
-        last_index: int
+        bokeh: Bokeh = None
+        last_index: int = -1
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
         self._webapp = BokehWebapp('Live', "basic.html.j2", self.p.scheme, self._build_root_model, on_session_destroyed=self._on_session_destroyed)
         self._lock = Lock()
         self._datastore = None
         self._docstates: Dict[Document, PlotListener.DocDataState] = {}
+        self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
 
     def _create_bokeh(self):
-        return Bokeh(style=self.p.style)
+        return Bokeh(style=self.p.style, **self._bokeh_kwargs)
 
     def _on_session_destroyed(self, session_context):
         with self._lock:
@@ -50,15 +51,14 @@ class PlotListener(bt.ListenerBase):
             del self._docstates[doc]
 
     def _build_root_model(self, doc: Document):
-        bokeh = Bokeh(style=self.p.style)
+        bokeh = self._create_bokeh()
         bokeh.plot(self._cerebro.runningstrats[self.p.strategyidx], fill_data=False)
         model = bokeh.generate_model()
 
         with self._lock:
             self._docstates[doc] = PlotListener.DocDataState(bokeh=bokeh, last_index=-1)
 
-        # stream actual data on next chance - maybe it would even be possible to stream it here directly?
-        doc.add_next_tick_callback(self._push_updates)
+        self._push_updates(doc)
         return model
 
     def start(self, cerebro):
@@ -78,18 +78,24 @@ class PlotListener(bt.ListenerBase):
         loop = tornado.ioloop.IOLoop.current()
         self._webapp.start(loop)
 
-    def _push_updates(self):
-        document = curdoc()
+    def _push_updates(self, bootstrap_document=None):
+        if bootstrap_document is None:
+            document = curdoc()
+        else:
+            document = bootstrap_document
+
         with self._lock:
             state: PlotListener.DocDataState = self._docstates[document]
-            updatepkg: pandas.DataFrame = self._datastore[self._datastore['index'] > state.last_index]
+            last_index = state.last_index
+
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > last_index]
 
             # skip if we don't have new data
-            if updatepkg.shape[0] == 0:
+            if updatepkg_df.shape[0] == 0:
                 return
 
-            state.last_index = updatepkg['index'].iloc[-1]  # update last index
-            updatepkg = ColumnDataSource.from_df(updatepkg)
+            state.last_index = updatepkg_df['index'].iloc[-1]  # update last index
+            updatepkg = ColumnDataSource.from_df(updatepkg_df)
 
             cds: ColumnDataSource = state.bokeh.get_figurepage().cds
             sendpkg = {}
@@ -98,6 +104,9 @@ class PlotListener(bt.ListenerBase):
                     sendpkg[c] = updatepkg[c]
 
             cds.stream(sendpkg, self.p.lookback)
+
+            i = 6
+            i += 3
 
     def next(self, doc=None):
         with self._lock:
@@ -109,4 +118,9 @@ class PlotListener(bt.ListenerBase):
             self._datastore = self._datastore.tail(self.p.lookback)
 
             for doc in self._docstates.keys() if doc is None else [doc]:
+                try:
+                    doc.remove_next_tick_callback(self._push_updates)
+                except ValueError:
+                    # there was no callback to remove
+                    pass
                 doc.add_next_tick_callback(self._push_updates)

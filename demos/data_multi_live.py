@@ -11,8 +11,8 @@ from freezegun import freeze_time
 
 try:
     from backtrader_plotting.bokeh.live.plotlistener import PlotListener
-except Exception:
-    pass
+except AttributeError:
+    raise Exception('Plotting in live mode only supported when using modified backtrader package from this branch https://github.com/verybadsoldier/backtrader/tree/development')
 
 _logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def _run_resampler(data_timeframe,
                    num_gen_bars=20,
                    ) -> bt.Strategy:
     _logger.info("Constructing Cerebro")
-    cerebro = bt.Cerebro(bar_on_exit=False)
+    cerebro = bt.Cerebro()
     cerebro.addstrategy(bt.strategies.NullStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
@@ -69,21 +69,11 @@ def _run_resampler(data_timeframe,
     return cerebro, res[0]
 
 
-@freeze_time("Jan 1th, 2000", tick=True)
-def test_live_multi_std():
-    return
-    cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
-                                   data_compression=1,
-                                   resample_timeframe=bt.TimeFrame.Minutes,
-                                   resample_compression=1,
-                                   runtime_seconds=900,
-                                   )
-
-
-    nexts = strat.nexts
-    bt.strategies.BarRecorderStrategy.print_nexts(nexts)
-
-
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
-    test_live_multi_std()
+    cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
+                                    data_compression=1,
+                                    resample_timeframe=bt.TimeFrame.Minutes,
+                                    resample_compression=1,
+                                    runtime_seconds=190,
+                                    )

@@ -41,7 +41,7 @@ def _get_datas(strategy: bt.Strategy) -> str:
             'Bar Length:': f"{data._compression} {bt.TimeFrame.getname(data._timeframe, data._compression)}",
         }
 
-        # live trading does not have valid data parameters
+        # live trading does not have valid data parameters (other datas might also not have)
         if not math.isinf(data.fromdate):
             tabdata['Time From:'] = bt.num2date(data.fromdate)
 

@@ -43,3 +43,7 @@ def test_github_issue30():
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
     assert len(figs[0][0].figures) == 4
     assert len(figs[0][0].analyzers) == 1
+
+
+if __name__ == '__main__':
+    test_github_issue30()

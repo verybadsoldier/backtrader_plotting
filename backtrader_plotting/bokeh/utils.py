@@ -88,8 +88,10 @@ def generate_stylesheet(scheme, template="basic.css.j2") -> str:
 
 
 def append_cds(base_cds: ColumnDataSource, new_cds: ColumnDataSource):
+    updates = []
     for c in new_cds.keys():
         if c not in base_cds.column_names:
             continue
-        base_cds.data[c] = new_cds[c]
+        updates.append((c, new_cds[c]))
+    base_cds.data.update(updates)
 

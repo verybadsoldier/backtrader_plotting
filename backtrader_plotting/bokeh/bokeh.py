@@ -1,4 +1,5 @@
 from array import array
+from collections import defaultdict
 import bisect
 import datetime
 import itertools
@@ -26,8 +27,8 @@ from bokeh.util.browser import view
 
 from jinja2 import Environment, PackageLoader
 
-from backtrader_plotting.bokeh.utils import generate_stylesheet, adapt_yranges, append_cds
-from backtrader_plotting.utils import convert_by_line_clock, get_data_obj
+from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
+from backtrader_plotting.utils import convert_by_line_clock, get_clock_line
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.utils import find_by_plotid
 from backtrader_plotting.bokeh.figure import Figure, HoverContainer
@@ -410,11 +411,15 @@ class Bokeh(metaclass=bt.MetaParams):
                             start: Optional[datetime.datetime] = None, end: Optional[datetime.datetime] = None,
                             num_back: Optional[int] = None,
                             startidx: int = 0):
-        stratedata = pd.DataFrame()
+        """startidx: index number to write into the dataframe for the index column"""
+        strategydf = pd.DataFrame()
 
         start, end = Bokeh._get_start_end(strategy, start, end)
 
         strat_clk: array[float] = strategy.lines.datetime.plotrange(start, end)
+
+        # if patches occured then we see duplicate entries in the strategie clock -> clean them
+        strat_clk = np.unique(strat_clk)
 
         if num_back is None:
             num_back = len(strat_clk)
@@ -426,17 +431,17 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
         indices = list(range(startidx, startidx + len(dtline)))
-        stratedata['datetime'] = dtline
-        stratedata['index'] = indices
+        strategydf['datetime'] = dtline
+        strategydf['index'] = indices
 
         for data in strategy.datas:
             source_id = Figure._source_id(data)
             df_data = convert_to_pandas(strat_clk, data, start, end, source_id)
 
-            stratedata = stratedata.join(df_data)
+            strategydf = strategydf.join(df_data)
 
             df_colors = Figure.build_color_lines(df_data, self.p.scheme, col_open=source_id + 'open', col_close=source_id + 'close', col_prefix=source_id)
-            stratedata = stratedata.join(df_colors)
+            strategydf = strategydf.join(df_colors)
 
         for obj in itertools.chain(strategy.getindicators(), strategy.getobservers()):
             for lineidx in range(obj.size()):
@@ -444,12 +449,11 @@ class Bokeh(metaclass=bt.MetaParams):
                 source_id = Figure._source_id(line)
                 dataline = line.plotrange(start, end)
 
-                line_clk = obj._clock.lines.datetime.plotrange(start, end)
-                #line_clk2 = get_data_obj(obj).lines.datetime.plotrange(start, end)
+                line_clk = get_clock_line(obj).plotrange(start, end)
                 dataline = convert_by_line_clock(dataline, line_clk, strat_clk)
-                stratedata[source_id] = dataline
+                strategydf[source_id] = dataline
 
-        return stratedata
+        return strategydf
 
     #  region interface for backtrader
     def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, fill_data=True, **kwargs):

@@ -107,3 +107,6 @@ def test_github_issue10():
     )
 
     bokeh_plot(data)
+
+if __name__ == '__main__':
+    test_github_issue10()

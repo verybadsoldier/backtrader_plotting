@@ -56,14 +56,17 @@ def convert_by_line_clock(line, line_clk, new_clk):
         return line
 
     new_line = []
-    next_idx = len(line_clk) - 1
+    next_start_idx = 0
     for sc in new_clk:
-        for i in range(next_idx, -1, -1):  # run from next_idx to -1 (-1 so we actually also catch index 0!)
-            v = line_clk[-i]
+        for i in range(next_start_idx, len(line_clk)):
+#        for i, v in enumerate(line_clk):  # run from next_idx to -1 (-1 so we actually also catch index 0!)
+            v = line_clk[i]
             if sc == v:
                 # exact hit
-                new_line.append(line[-i])
-                next_idx = i
+                if i >= len(line):
+                    continue
+                new_line.append(line[i])
+                next_start_idx = i + 1
                 break
         else:
             new_line.append(float('nan'))
@@ -92,12 +95,22 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
     return df
 
 
-def get_data_obj(obj):
-    """obj can be a data object or just a single line (in case indicator was created with an explicit line)"""
-    if obj._owner is not None:
-        return obj._owner
+def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase]):
+    """Find the corresponding clock for an object."""
+    if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase)):
+        return get_clock_line(obj._clock)
+    elif isinstance(obj, (bt.AbstractDataBase, bt.StrategyBase)):
+        if obj._owner is not None:
+            clk = obj._owner
+        else:
+            clk = obj
+    elif isinstance(obj, bt.LineSeriesStub):
+        # indicators can be created to run on a single line (instead of e.g. a data object)
+        # in that case we grab the owner of that line to find the corresponding clok
+        return get_clock_line(obj._owner)
     else:
-        return obj
+        raise Exception(f'Unsupported object type passed: {obj.__class__}')
+    return clk.lines.datetime
 
 
 def find_by_plotid(strategy: bt.Strategy, plotid):

@@ -61,7 +61,7 @@ class OptBrowser:
         selector = DataTable(source=cds, columns=tab_columns, width=1600, height=150)
         return selector, cds
 
-    def build_optresult_model(self) -> Model:
+    def build_optresult_model(self, _=None) -> Model:
         """Generates and returns an interactive model for an OptResult or an OrderedOptResult"""
 
         # we have list of results, each result contains the result for one strategy. we don't support having more than one strategy!

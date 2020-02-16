@@ -18,7 +18,6 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.utils import convert_to_pandas, nanfilt, get_data_obj
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
 
 
@@ -271,11 +270,16 @@ class Figure(object):
         # build binary series determining if up or down bar
         is_up: pd.DataFrame = df[col_close] > df[col_open]
 
+        # we use the open-line as a indicator for NaN values
+        nan_ref = df[col_open]
+
+        # TODO: we want to have NaN values in the color lines if the corresponding data is also NaN
+        # find better way withl ess isnan usage
         df = pd.DataFrame()
-        df[col_prefix + 'colors_bars'] = [colorup if x else colordown for x in is_up]
-        df[col_prefix + 'colors_wicks'] = [colorup_wick if x else colordown_wick for x in is_up]
-        df[col_prefix + 'colors_outline'] = [colorup_outline if x else colordown_outline for x in is_up]
-        df[col_prefix + 'colors_volume'] = [volup if x else voldown for x in is_up]
+        df[col_prefix + 'colors_bars'] = [np.nan if np.isnan(n) else colorup if x else colordown for x, n in zip(is_up, nan_ref)]
+        df[col_prefix + 'colors_wicks'] = [np.nan if np.isnan(n) else colorup_wick if x else colordown_wick for x, n in zip(is_up, nan_ref)]
+        df[col_prefix + 'colors_outline'] = [np.nan if np.isnan(n) else colorup_outline if x else colordown_outline for x, n in zip(is_up, nan_ref)]
+        df[col_prefix + 'colors_volume'] = [np.nan if np.isnan(n) else volup if x else voldown for x, n in zip(is_up, nan_ref)]
         return df
 
     def _add_column(self, name, dtype):
@@ -344,7 +348,6 @@ class Figure(object):
 
         ax_formatter = NumeralTickFormatter(format=self._scheme.number_format)
 
-        source_data_axis = None
         if extra_axis:
             source_data_axis = 'axvol'
 
@@ -366,8 +369,9 @@ class Figure(object):
 
         vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
 
-        # make sure the new axis only auto-scale to the volume data
-        self.figure.extra_y_ranges['axvol'].renderers = [vbars]
+        # make sure the new axis only auto-scales to the volume data
+        if extra_axis:
+            self.figure.extra_y_ranges['axvol'].renderers = [vbars]
 
         self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 

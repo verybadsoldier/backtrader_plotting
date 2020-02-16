@@ -1,6 +1,9 @@
 import asyncio
+import logging
+from collections import defaultdict
 from threading import Lock
 from typing import Dict, Optional
+import numpy as np
 import threading
 
 from attr import dataclass
@@ -18,6 +21,8 @@ from backtrader_plotting import Bokeh
 import pandas
 
 import tornado.ioloop
+
+_logger = logging.getLogger(__name__)
 
 
 class PlotListener(bt.ListenerBase):
@@ -41,6 +46,7 @@ class PlotListener(bt.ListenerBase):
         self._docstates: Dict[Document, PlotListener.DocDataState] = {}
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
+        self._patch_pkgs = {}
 
     def _create_bokeh(self):
         return Bokeh(style=self.p.style, **self._bokeh_kwargs)
@@ -58,7 +64,7 @@ class PlotListener(bt.ListenerBase):
         with self._lock:
             self._docstates[doc] = PlotListener.DocDataState(bokeh=bokeh, last_index=-1)
 
-        self._push_updates(doc)
+        self._push_adds(doc)
         return model
 
     def start(self, cerebro):
@@ -78,7 +84,30 @@ class PlotListener(bt.ListenerBase):
         loop = tornado.ioloop.IOLoop.current()
         self._webapp.start(loop)
 
-    def _push_updates(self, bootstrap_document=None):
+    def _push_patches(self):
+        document = curdoc()
+        with self._lock:
+            state: PlotListener.DocDataState = self._docstates[document]
+            cds: ColumnDataSource = state.bokeh.get_figurepage().cds
+
+            patch_pkgs = self._patch_pkgs[document]
+            _logger.info(f"Patch package: {patch_pkgs}")
+            self._patch_pkgs[document] = []
+
+            dt_idx_map = {d: idx for idx, d in enumerate(cds.data['datetime'])}
+
+            patch_dict = defaultdict(list)
+            for pp in patch_pkgs:
+                colname, dt, val = pp
+                if colname not in cds.data:
+                    continue
+                idx = dt_idx_map[dt]
+                patch_dict[colname].append((idx, val))
+            _logger.info(f"Sending patch dict: {patch_dict}")
+
+            cds.patch(patch_dict)
+
+    def _push_adds(self, bootstrap_document=None):
         if bootstrap_document is None:
             document = curdoc()
         else:
@@ -105,22 +134,58 @@ class PlotListener(bt.ListenerBase):
 
             cds.stream(sendpkg, self.p.lookback)
 
-            i = 6
-            i += 3
-
     def next(self, doc=None):
-        with self._lock:
-            nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
-        new_frame = self._bokeh.build_strategy_data(self._cerebro.runningstrats[self.p.strategyidx], num_back=1, startidx=nextidx)
+        strategy = self._cerebro.runningstrats[self.p.strategyidx]
 
-        with self._lock:
-            self._datastore = self._datastore.append(new_frame)
-            self._datastore = self._datastore.tail(self.p.lookback)
+        #minper = strategy._getminperstatus()
+        #if minper > 0:
+        #    return
 
-            for doc in self._docstates.keys() if doc is None else [doc]:
-                try:
-                    doc.remove_next_tick_callback(self._push_updates)
-                except ValueError:
-                    # there was no callback to remove
-                    pass
-                doc.add_next_tick_callback(self._push_updates)
+        # treat as update of old data if strategy datetime is duplicated and we have already data stored
+        is_update = len(strategy) > 1 and strategy.datetime[0] == strategy.datetime[-1] and self._datastore.shape[0] > 0
+
+        if is_update:
+            with self._lock:
+                fulldata = self._bokeh.build_strategy_data(strategy)
+
+                new_count = fulldata.isnull().sum()
+                cur_count = self._datastore.isnull().sum()
+
+                patched_cols = new_count != cur_count
+
+                patchcols = fulldata[fulldata.columns[patched_cols]]
+                for columnName, columnData in patchcols.iteritems():
+                    # compare all values in this column
+                    for i, d in enumerate(columnData):
+                        od = self._datastore[columnName].iloc[i]
+                        # if value is different then put to patch package
+                        # either it WAS NaN and it's not anymore
+                        # or both not NaN but different now
+                        # and don't could it as True when both are NaN
+                        if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
+                            self._datastore[columnName].iloc[i] = d  # update data in datastore
+                            for doc in self._docstates.keys():
+                                if doc not in self._patch_pkgs:
+                                    self._patch_pkgs[doc] = []
+                                self._patch_pkgs[doc].append((columnName, self._datastore['datetime'].iloc[i].to_datetime64(), fulldata[columnName][i]))
+
+                for doc in self._docstates.keys():
+                    doc.add_next_tick_callback(self._push_patches)
+        else:
+            with self._lock:
+                nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
+
+            num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
+            new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
+
+            with self._lock:
+                self._datastore = self._datastore.append(new_frame)
+                self._datastore = self._datastore.tail(self.p.lookback)
+
+                for doc in self._docstates.keys() if doc is None else [doc]:
+                    try:
+                        doc.remove_next_tick_callback(self._push_adds)
+                    except ValueError:
+                        # there was no callback to remove
+                        pass
+                    doc.add_next_tick_callback(self._push_adds)

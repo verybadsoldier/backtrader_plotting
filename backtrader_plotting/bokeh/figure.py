@@ -268,7 +268,7 @@ class Figure(object):
         voldown = convert_color(scheme.voldown)
 
         # build binary series determining if up or down bar
-        is_up: pd.DataFrame = df[col_close] > df[col_open]
+        is_up: pd.DataFrame = df[col_close] >= df[col_open]
 
         # we use the open-line as a indicator for NaN values
         nan_ref = df[col_open]

@@ -17,6 +17,7 @@ from bokeh.document import Document
 from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting import Bokeh
+from backtrader_plotting.bokeh.live.livemodelfactory import LiveModelFactory
 
 import pandas
 
@@ -59,7 +60,9 @@ class PlotListener(bt.ListenerBase):
     def _build_root_model(self, doc: Document):
         bokeh = self._create_bokeh()
         bokeh.plot(self._cerebro.runningstrats[self.p.strategyidx], fill_data=False)
-        model = bokeh.generate_model()
+
+        livmodelfac = LiveModelFactory(bokeh)
+        model = livmodelfac.generate_live_model()
 
         with self._lock:
             self._docstates[doc] = PlotListener.DocDataState(bokeh=bokeh, last_index=-1)

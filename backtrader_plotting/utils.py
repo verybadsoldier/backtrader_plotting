@@ -59,12 +59,9 @@ def convert_by_line_clock(line, line_clk, new_clk):
     next_start_idx = 0
     for sc in new_clk:
         for i in range(next_start_idx, len(line_clk)):
-#        for i, v in enumerate(line_clk):  # run from next_idx to -1 (-1 so we actually also catch index 0!)
             v = line_clk[i]
             if sc == v:
                 # exact hit
-                if i >= len(line):
-                    continue
                 new_line.append(line[i])
                 next_start_idx = i + 1
                 break

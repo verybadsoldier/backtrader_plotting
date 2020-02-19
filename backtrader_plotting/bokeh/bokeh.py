@@ -361,9 +361,6 @@ class Bokeh(metaclass=bt.MetaParams):
     # endregion
 
     def _get_analyzer_panel(self, analyzers: List[bt.Analyzer]) -> Optional[Panel]:
-        def _get_column_row_count(col) -> int:
-            return sum([x.height for x in col if x.height is not None])
-
         if len(analyzers) == 0:
             return None
 

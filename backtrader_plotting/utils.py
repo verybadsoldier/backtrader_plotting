@@ -25,6 +25,8 @@ def paramval2str(name, value):
         return ','.join(value)
     elif isinstance(value, type):
         return value.__name__
+    elif isinstance(value, tuple):
+        return value.__name__
     else:
         return f"{value:.2f}"
 
@@ -96,11 +98,8 @@ def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase
     """Find the corresponding clock for an object."""
     if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase)):
         return get_clock_line(obj._clock)
-    elif isinstance(obj, (bt.AbstractDataBase, bt.StrategyBase)):
-        if obj._owner is not None:
-            clk = obj._owner
-        else:
-            clk = obj
+    elif isinstance(obj, (bt.StrategyBase, bt.AbstractDataBase)):
+        clk = obj
     elif isinstance(obj, bt.LineSeriesStub):
         # indicators can be created to run on a single line (instead of e.g. a data object)
         # in that case we grab the owner of that line to find the corresponding clok

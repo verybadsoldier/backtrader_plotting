@@ -13,22 +13,18 @@ _logger = logging.getLogger(__name__)
 
 
 def paramval2str(name, value):
-    if value is None:
-        return 'None'
+    if value is None:  # catch None value early here!
+        return str(value)
     elif name == "timeframe":
         return bt.TimeFrame.getname(value, 1)
-    elif isinstance(value, str):
-        return value
-    elif isinstance(value, int):
-        return str(value)
+    elif isinstance(value, float):
+        return f"{value:.2f}"
     elif isinstance(value, list):
         return ','.join(value)
     elif isinstance(value, type):
         return value.__name__
-    elif isinstance(value, tuple):
-        return value.__name__
     else:
-        return f"{value:.2f}"
+        return str(value)
 
 
 def get_nondefault_params(params: object) -> Dict[str, object]:

@@ -99,7 +99,7 @@ def find_by_plotid(strategy: bt.Strategy, plotid):
     objs = itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers())
     founds = []
     for obj in objs:
-        if getattr(obj.plotinfo, 'ploftid', None) == plotid:
+        if getattr(obj.plotinfo, 'plotid', None) == plotid:
             founds.append(obj)
 
     num_results = len(founds)

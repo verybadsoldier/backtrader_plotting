@@ -9,7 +9,10 @@ from testcommon import getdatadir
 class BokehTest(bt.Strategy):
 
     def __init__(self):
-        self.rsi = bt.indicators.RSI_SMA(self.data.close, period=14, safediv=True, plotid='rsi')
+        self.rsi = bt.indicators.RSI_SMA(self.data.close, period=14, safediv=True)
+
+        # we set it manually (vanilla backtrader doesn't know about plotid so we can't set regularly in constructor)
+        self.rsi.plotinfo.plotid = 'rsi'
 
 
 def test_github_issue37_plotaspectratio():

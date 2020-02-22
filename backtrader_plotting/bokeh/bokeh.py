@@ -31,7 +31,7 @@ from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
 from backtrader_plotting.utils import convert_by_line_clock, get_clock_line
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.utils import find_by_plotid
-from backtrader_plotting.bokeh.figure import Figure, HoverContainer
+from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting.schemes.scheme import Scheme
@@ -49,7 +49,7 @@ if 'ipykernel' in sys.modules:
 
 class FigurePage(object):
     def __init__(self, obj: Union[bt.Strategy, bt.OptReturn]):
-        self.figures: List[Figure] = []
+        self.figure_envs: List[FigureEnvelope] = []
         self.strategy: Optional[bt.Strategy] = obj if isinstance(obj, bt.Strategy) else None
         self.cds = ColumnDataSource(data=dict(datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
@@ -222,7 +222,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
+            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
 
             figure.plot(master, None)
 
@@ -248,14 +248,14 @@ class Bokeh(metaclass=bt.MetaParams):
 
         hoverc.apply_hovertips(strat_figures)
 
-        self._cur_figurepage.figures += strat_figures
+        self._cur_figurepage.figure_envs += strat_figures
 
         # volume graphs
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
-            figure = Figure(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, is_multidata=len(strategy.datas) > 1)
+            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, is_multidata=len(strategy.datas) > 1)
             figure.plot_volume(v)
-            self._cur_figurepage.figures.append(figure)
+            self._cur_figurepage.figure_envs.append(figure)
 
     def plot_and_generate_optmodel(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self._reset()
@@ -266,7 +266,7 @@ class Bokeh(metaclass=bt.MetaParams):
         return self.generate_model(0)
 
     @staticmethod
-    def _sort_plotobjects(objs: List[Figure]) -> None:
+    def _sort_plotobjects(objs: List[FigureEnvelope]) -> None:
         objs.sort(key=lambda x: x.plotorder)
 
     def get_figurepage(self, idx: int = 0):
@@ -318,9 +318,9 @@ class Bokeh(metaclass=bt.MetaParams):
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
     def _generate_model_tabs(self, fp: FigurePage) -> List[Panel]:
-        observers = [x for x in fp.figures if isinstance(x.master, bt.Observer)]
-        datas = [x for x in fp.figures if isinstance(x.master, bt.DataBase)]
-        inds = [x for x in fp.figures if isinstance(x.master, bt.Indicator)]
+        observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
+        datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
+        inds = [x for x in fp.figure_envs if isinstance(x.master, bt.Indicator)]
 
         # now assign figures to tabs
         # 1. assign default tabs if no manual tab is assigned
@@ -432,18 +432,18 @@ class Bokeh(metaclass=bt.MetaParams):
         strategydf['index'] = indices
 
         for data in strategy.datas:
-            source_id = Figure._source_id(data)
+            source_id = FigureEnvelope._source_id(data)
             df_data = convert_to_pandas(strat_clk, data, start, end, source_id)
 
             strategydf = strategydf.join(df_data)
 
-            df_colors = Figure.build_color_lines(df_data, self.p.scheme, col_open=source_id + 'open', col_close=source_id + 'close', col_prefix=source_id)
+            df_colors = FigureEnvelope.build_color_lines(df_data, self.p.scheme, col_open=source_id + 'open', col_close=source_id + 'close', col_prefix=source_id)
             strategydf = strategydf.join(df_colors)
 
         for obj in itertools.chain(strategy.getindicators(), strategy.getobservers()):
             for lineidx in range(obj.size()):
                 line = obj.lines[lineidx]
-                source_id = Figure._source_id(line)
+                source_id = FigureEnvelope._source_id(line)
                 dataline = line.plotrange(start, end)
 
                 line_clk = get_clock_line(obj).plotrange(start, end)

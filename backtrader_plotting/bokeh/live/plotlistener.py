@@ -61,8 +61,8 @@ class PlotListener(bt.ListenerBase):
         bokeh = self._create_bokeh()
         bokeh.plot(self._cerebro.runningstrats[self.p.strategyidx], fill_data=False)
 
-        livmodelfac = LiveModelFactory(bokeh)
-        model = livmodelfac.generate_live_model()
+        livemodelfactory = LiveModelFactory(bokeh)
+        model = livemodelfactory.generate_live_model()
 
         with self._lock:
             self._docstates[doc] = PlotListener.DocDataState(bokeh=bokeh, last_index=-1)

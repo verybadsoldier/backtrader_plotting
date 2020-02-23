@@ -164,6 +164,13 @@ class Bokeh(metaclass=bt.MetaParams):
                 data_graph[obj] = []
             else:
                 plotmaster = plotmaster if plotmaster is not None else obj.data
+
+                # plotmaster being a LineSeriesStub can mean the indicator was created using a specific line
+                # .e.g. "SMA()" vs "SMA(data.lines.close)"
+                # in the latter case a LineSeriesStub is created which we will resolve to the original data here
+                if isinstance(plotmaster, bt.LineSeriesStub):
+                    plotmaster = plotmaster._owner
+
                 if plotmaster not in data_graph:
                     data_graph[plotmaster] = []
                 data_graph[plotmaster].append(obj)

@@ -137,6 +137,24 @@ def test_std_backtest_ind_subplot(cerebro: bt.Cerebro):
     assert_num_figures(figs, 5)
 
 
+def test_std_backtest_ind_on_line(cerebro: bt.Cerebro):
+    """In the past it crashed when creating indicators with specific lines case LineSeriesStub was not handled correctly"""
+    class TestStrategy(bt.Strategy):
+        def __init__(self):
+            self._sma = bt.indicators.SMA(self.data.close)
+
+    cerebro.addstrategy(TestStrategy)
+    cerebro.run()
+
+    s = backtrader_plotting.schemes.Blackly()
+    b = Bokeh(style='bar', scheme=s, output_mode=_output_mode)
+    figs = cerebro.plot(b)
+
+    assert len(figs) == 1
+    assert_num_tabs(figs, 3)
+    assert_num_figures(figs, 3)
+
+
 def test_backtest_2strats(cerebro: bt.Cerebro):
     cerebro.addstrategy(bt.strategies.MA_CrossOver)
     cerebro.addstrategy(ToggleStrategy)

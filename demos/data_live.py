@@ -17,6 +17,14 @@ except AttributeError:
 _logger = logging.getLogger(__name__)
 
 
+class LiveDemoStrategy(bt.Strategy):
+    def __init__(self):
+        pass
+        self._sma = bt.indicators.SMA(self.data0.close, subplot=True)
+        self._sma2 = bt.indicators.SMA(self.data1.close, subplot=True)
+        # self._sma = bt.indicators.SMA(data=self.data1, plotname='Sma2nd')
+
+
 def _get_trading_calendar(open_hour, close_hour, close_minute):
     cal = bt.TradingCalendar(open=datetime.time(hour=open_hour), close=datetime.time(hour=close_hour, minute=close_minute))
     return cal
@@ -33,7 +41,7 @@ def _run_resampler(data_timeframe,
                    ) -> bt.Strategy:
     _logger.info("Constructing Cerebro")
     cerebro = bt.Cerebro()
-    cerebro.addstrategy(bt.strategies.NullStrategy)
+    cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
     cerebro.addlistener(PlotListener, data_fill_forward=True)

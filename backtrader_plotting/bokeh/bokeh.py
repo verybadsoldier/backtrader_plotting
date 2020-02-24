@@ -27,16 +27,15 @@ from bokeh.util.browser import view
 
 from jinja2 import Environment, PackageLoader
 
-from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
+from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds, get_indicator_data
 from backtrader_plotting.utils import convert_by_line_clock, get_clock_line
 from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.utils import find_by_plotid
+from backtrader_plotting.utils import find_by_plotid, convert_to_pandas
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting.schemes.scheme import Scheme
 from backtrader_plotting.html import metadata
-from backtrader_plotting.utils import convert_to_pandas
 
 _logger = logging.getLogger(__name__)
 
@@ -54,6 +53,12 @@ class FigurePage(object):
         self.cds = ColumnDataSource(data=dict(datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
+
+    def get_logicgroups(self) -> List[str]:
+        logicgroups = set()
+        for fe in self.figure_envs:
+            logicgroups = logicgroups.union(fe.get_logicgroups())
+        return list(logicgroups)
 
 
 class Bokeh(metaclass=bt.MetaParams):
@@ -163,13 +168,7 @@ class Bokeh(metaclass=bt.MetaParams):
             if subplot and plotmaster is None:
                 data_graph[obj] = []
             else:
-                plotmaster = plotmaster if plotmaster is not None else obj.data
-
-                # plotmaster being a LineSeriesStub can mean the indicator was created using a specific line
-                # .e.g. "SMA()" vs "SMA(data.lines.close)"
-                # in the latter case a LineSeriesStub is created which we will resolve to the original data here
-                if isinstance(plotmaster, bt.LineSeriesStub):
-                    plotmaster = plotmaster._owner
+                plotmaster = plotmaster if plotmaster is not None else get_indicator_data(obj)
 
                 if plotmaster not in data_graph:
                     data_graph[plotmaster] = []
@@ -346,7 +345,7 @@ class Bokeh(metaclass=bt.MetaParams):
         sorted_figs.sort(key=lambda x: x.plottab)
         tabgroups = itertools.groupby(sorted_figs, lambda x: x.plottab)
 
-        tabs = []
+        panels = []
 
         def build_panel(objects, panel_title):
             if len(objects) == 0:
@@ -359,12 +358,12 @@ class Bokeh(metaclass=bt.MetaParams):
                          toolbar_location=self.p.scheme.toolbar_location,
                          sizing_mode=self.p.scheme.plot_sizing_mode,
                          )
-            tabs.append(Panel(title=panel_title, child=g))
+            panels.append(Panel(title=panel_title, child=g))
 
         for tabname, figures in tabgroups:
             build_panel(list(figures), tabname)
 
-        return tabs
+        return panels
     # endregion
 
     def _get_analyzer_panel(self, analyzers: List[bt.Analyzer]) -> Optional[Panel]:

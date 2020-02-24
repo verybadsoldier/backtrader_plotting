@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, adapt_yranges
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_indicator_data
 
 
 class HoverContainer(metaclass=bt.MetaParams):
@@ -124,7 +124,34 @@ class FigureEnvelope(object):
         self.plotorder = plotorder
         self.datas = []  # list of all datas that have been plotted to this figure
         self._is_multidata = is_multidata
+        self._logicgroup = None
         self._init_figure()
+
+    @staticmethod
+    def _resolve_logicgroup(obj):
+        if isinstance(obj, bt.AbstractDataBase):
+            # data feeds are end points
+            return obj._name
+        elif isinstance(obj, bt.IndicatorBase):
+            # lets find the data the indicator is based on
+            data = get_indicator_data(obj)
+            return FigureEnvelope._resolve_logicgroup(data)
+        elif isinstance(obj, bt.ObserverBase):
+            return str(id(obj._clock))
+        else:
+            raise Exception('unsupported')
+
+    def get_logicgroups(self) -> List[str]:
+        logicgroups = []
+        if self._logicgroup is None:
+            logicgroups.append(self._resolve_logicgroup(self.master))
+        elif isinstance(self._logicgroup, list):
+            logicgroups += self._logicgroup
+        elif isinstance(self._logicgroup, str):
+            logicgroups.append(self._logicgroup)
+        else:
+            raise Exception(f'Invalid type for logicgroup: {type(self._logicgroup)}')
+        return logicgroups
 
     def _set_single_hover_renderer(self, ren: Renderer):
         """Sets this figure's hover to a single renderer"""
@@ -252,6 +279,11 @@ class FigureEnvelope(object):
             order = getattr(obj.plotinfo, 'plotorder', None)
             if order is not None:
                 self.plotorder = order
+
+            # just store the logicgroup of the master for later reference
+            logicgroup = getattr(obj.plotinfo, 'logicgroup', None)
+            if logicgroup is not None:
+                self._logicgroup = logicgroup
 
         self.datas.append(obj)
 

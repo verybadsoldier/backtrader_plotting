@@ -17,7 +17,7 @@ from bokeh.document import Document
 from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting import Bokeh
-from backtrader_plotting.bokeh.live.livemodelfactory import LiveModelFactory
+from backtrader_plotting.bokeh.live.liveclient import LiveClient
 
 import pandas
 
@@ -61,14 +61,13 @@ class PlotListener(bt.ListenerBase):
         bokeh = self._create_bokeh()
         bokeh.plot(self._cerebro.runningstrats[self.p.strategyidx], fill_data=False)
 
-        livemodelfactory = LiveModelFactory(bokeh)
-        model = livemodelfactory.generate_live_model()
+        client = LiveClient(bokeh)
 
         with self._lock:
             self._docstates[doc] = PlotListener.DocDataState(bokeh=bokeh, last_index=-1)
 
         self._push_adds(doc)
-        return model
+        return client.model
 
     def start(self, cerebro):
         self._cerebro = cerebro

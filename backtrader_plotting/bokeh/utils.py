@@ -2,6 +2,7 @@ from jinja2 import Environment, PackageLoader
 
 import matplotlib.colors
 
+import backtrader as bt
 from backtrader_plotting.utils import nanfilt
 
 from bokeh.models import ColumnDataSource
@@ -95,3 +96,12 @@ def append_cds(base_cds: ColumnDataSource, new_cds: ColumnDataSource):
         updates.append((c, new_cds[c]))
     base_cds.data.update(updates)
 
+
+def get_indicator_data(indicator: bt.Indicator):
+    """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
+    a LineSeriesStub has been created for which we have to resolve the original data"""
+    data = indicator.data
+    if isinstance(data, bt.LineSeriesStub):
+        return data._owner
+    else:
+        return data

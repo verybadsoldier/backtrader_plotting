@@ -44,7 +44,7 @@ def _run_resampler(data_timeframe,
     cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
-    cerebro.addlistener(PlotListener, data_fill_forward=True)
+    cerebro.addlistener(PlotListener)
 
     data = bt.feeds.FakeFeed(timeframe=data_timeframe,
                              compression=data_compression,
@@ -61,15 +61,15 @@ def _run_resampler(data_timeframe,
 
 
     data2 = bt.feeds.FakeFeed(timeframe=data_timeframe,
-                             compression=data_compression,
-                             run_duration=datetime.timedelta(seconds=runtime_seconds),
-                             starting_value=starting_value,
-                             tick_interval=datetime.timedelta(seconds=11),
-                             live=True,
-                             num_gen_bars=num_gen_bars,
-                             start_delay=0,
-                             name='data2',
-                             )
+                              compression=data_compression,
+                              run_duration=datetime.timedelta(seconds=runtime_seconds),
+                              starting_value=starting_value,
+                              tick_interval=datetime.timedelta(seconds=11),
+                              live=True,
+                              num_gen_bars=num_gen_bars,
+                              start_delay=0,
+                              name='data2',
+                              )
 
     cerebro.resampledata(data2, timeframe=resample_timeframe, compression=1)
 
@@ -84,6 +84,6 @@ if __name__ == '__main__':
                                     data_compression=1,
                                     resample_timeframe=bt.TimeFrame.Minutes,
                                     resample_compression=1,
-                                    runtime_seconds=6000,
+                                    runtime_seconds=60000,
                                     tick_interval=datetime.timedelta(seconds=80),
                                     )

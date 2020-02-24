@@ -37,12 +37,13 @@ class LiveClient:
         panels.append(self._get_config_panel())
 
         groups = [self._ALL_GROUP_STR] + self._figurepage.get_logicgroups()
+        groups = [x for x in groups if not isinstance(x, bool)]
         self._current_group = groups[0]
         s = Select(value=self._current_group, options=groups)
         s.on_change('value', self._on_select_group)
 
         controls = row(children=[s])
-        self.model = column(children=[controls, Tabs(tabs=panels)])
+        self.model = column(children=[controls, Tabs(tabs=panels)], sizing_mode=self._bokeh.p.scheme.plot_sizing_mode)
 
         self._update_visibility(self._current_group)
 
@@ -89,4 +90,4 @@ class LiveClient:
     def _update_visibility(self, new_group):
         for f in self._figurepage.figure_envs:
             logicgroups = f.get_logicgroups()
-            f.figure.visible = new_group in logicgroups or new_group == self._ALL_GROUP_STR
+            f.figure.visible = new_group in logicgroups or new_group == self._ALL_GROUP_STR or True in logicgroups

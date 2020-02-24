@@ -57,7 +57,7 @@ class HoverContainer(metaclass=bt.MetaParams):
         tooltips_top = []
         tooltips_bottom = []
         for label, tmpl, src_obj in self._hover_tooltips:
-            apply = src_obj is fig.master  # apply to own
+            apply: bool = src_obj is fig.master  # apply to own
             foreign = False
             if not apply and (isinstance(src_obj, bt.Observer) or isinstance(src_obj, bt.Indicator)) and src_obj.plotinfo.subplot is False:
                 # add objects that are on the same figure cause subplot is False (for Indicators and Observers)
@@ -137,7 +137,10 @@ class FigureEnvelope(object):
             data = get_indicator_data(obj)
             return FigureEnvelope._resolve_logicgroup(data)
         elif isinstance(obj, bt.ObserverBase):
-            return str(id(obj._clock))
+            if isinstance(obj._clock, bt.AbstractDataBase):
+                return FigureEnvelope._resolve_logicgroup(obj._clock)
+            else:
+                return True  # for wide observers we return True which means it belongs to all logic groups
         else:
             raise Exception('unsupported')
 
@@ -151,6 +154,7 @@ class FigureEnvelope(object):
             logicgroups.append(self._logicgroup)
         else:
             raise Exception(f'Invalid type for logicgroup: {type(self._logicgroup)}')
+
         return logicgroups
 
     def _set_single_hover_renderer(self, ren: Renderer):

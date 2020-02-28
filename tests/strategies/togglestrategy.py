@@ -7,9 +7,6 @@ class ToggleStrategy(bt.Strategy):
         ('modsell', 54),
     )
 
-    def __init__(self):
-        macd = bt.indicators.MACD(subplot=True)
-
     def next(self):
         pos = len(self.data)
         if pos % self.p.modbuy == 0:

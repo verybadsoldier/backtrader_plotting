@@ -108,7 +108,7 @@ class HoverContainer(metaclass=bt.MetaParams):
 class FigureEnvelope(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, data_columns: List[Tuple[str, object]], hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._scheme = scheme
@@ -126,6 +126,7 @@ class FigureEnvelope(object):
         self._is_multidata = is_multidata
         self._logicgroup = None
         self._init_figure()
+        self._data_columns = data_columns
 
     @staticmethod
     def _resolve_logicgroup(obj):
@@ -323,7 +324,7 @@ class FigureEnvelope(object):
 
     def _add_columns(self, cols: List[Tuple[str, object]]):
         for name, dtype in cols:
-            self._cds.add(np.array([], dtype=dtype), name)
+            self._data_columns.append((name, dtype))
 
     def plot_data(self, data: bt.AbstractDataBase):
         source_id = FigureEnvelope._source_id(data)

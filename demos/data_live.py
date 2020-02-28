@@ -7,7 +7,6 @@ import datetime
 
 import backtrader as bt
 import logging
-from freezegun import freeze_time
 
 try:
     from backtrader_plotting.bokeh.live.plotlistener import PlotListener
@@ -18,11 +17,23 @@ _logger = logging.getLogger(__name__)
 
 
 class LiveDemoStrategy(bt.Strategy):
+    params = (
+        ('modbuy', 2),
+        ('modsell', 3),
+    )
+
     def __init__(self):
         pass
-        self._sma = bt.indicators.SMA(self.data0.close, subplot=True)
-        self._sma2 = bt.indicators.SMA(self.data1.close, subplot=True)
-        # self._sma = bt.indicators.SMA(data=self.data1, plotname='Sma2nd')
+        #self._sma = bt.indicators.SMA(self.data0.close, subplot=True)
+        #self._sma2 = bt.indicators.SMA(self.data1.close, subplot=True)
+
+    def next(self):
+        pos = len(self.data)
+        if pos % self.p.modbuy == 0:
+            self.buy(self.datas[0], size=None)
+
+        if pos % self.p.modsell == 0:
+            self.sell(self.datas[0], size=None)
 
 
 def _get_trading_calendar(open_hour, close_hour, close_minute):
@@ -45,6 +56,8 @@ def _run_resampler(data_timeframe,
 
     cerebro.addlistener(bt.listeners.RecorderListener)
     cerebro.addlistener(PlotListener)
+    
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
     data = bt.feeds.FakeFeed(timeframe=data_timeframe,
                              compression=data_compression,

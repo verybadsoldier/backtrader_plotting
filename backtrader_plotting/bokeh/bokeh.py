@@ -50,7 +50,8 @@ class FigurePage(object):
     def __init__(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self.figure_envs: List[FigureEnvelope] = []
         self.strategy: Optional[bt.Strategy] = obj if isinstance(obj, bt.Strategy) else None
-        self.cds = ColumnDataSource(data=dict(datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
+        self.cds: Optional[ColumnDataSource] = ColumnDataSource(data=dict(datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
+        self.data_columns: List[Tuple[str, object]] = []
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
@@ -228,7 +229,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
+            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, self._cur_figurepage.data_columns, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
 
             figure.plot(master, None)
 
@@ -323,7 +324,18 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
-    def _generate_model_tabs(self, fp: FigurePage) -> List[Panel]:
+    def _update_cds(self, fp: FigurePage):
+        # create an approproate cds for this possibly filtered (by logicgroup) model
+        for name in list(fp.cds.data):
+            fp.cds.remove(name)
+
+        fp.cds.add(np.array([], dtype=np.datetime64), 'datetime')
+        fp.cds.add(np.array([], dtype=np.float64), 'index')
+
+        for name, dtype in fp.data_columns:
+            fp.cds.add(np.array([], dtype=dtype), name)
+
+    def _generate_model_tabs(self, fp: FigurePage, logicgroup=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
         inds = [x for x in fp.figure_envs if isinstance(x.master, bt.Indicator)]
@@ -342,6 +354,17 @@ class Bokeh(metaclass=bt.MetaParams):
         # 2. group panels by desired tabs
         # groupby expects the groups to be sorted or else will produce duplicated groups
         sorted_figs = list(itertools.chain(datas, inds, observers))
+
+        # 3. filter logicgroups
+        if logicgroup is not None:
+            filtered = set()
+            for f in sorted_figs:
+                lgs = f.get_logicgroups()
+                for lg in lgs:
+                    if lg is True or lg == logicgroup:
+                        filtered.add(f)
+            sorted_figs = list(filtered)
+
         sorted_figs.sort(key=lambda x: x.plottab)
         tabgroups = itertools.groupby(sorted_figs, lambda x: x.plottab)
 
@@ -484,8 +507,8 @@ class Bokeh(metaclass=bt.MetaParams):
             if fill_data:
                 df: pd.DataFrame = self.build_strategy_data(obj, start, end)
 
-                new_cds = ColumnDataSource.from_df(df)
-                append_cds(fp.cds, new_cds)
+                fp.cds = ColumnDataSource.from_df(df)
+                # append_cds(fp.cds, new_cds)
         elif isinstance(obj, bt.OptReturn):
             # for optresults we only plot analyzers!
             self._cur_figurepage.analyzers += [a for _, a in obj.analyzers.getitems()]

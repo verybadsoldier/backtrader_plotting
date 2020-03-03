@@ -30,10 +30,12 @@ class LiveDemoStrategy(bt.Strategy):
     def next(self):
         pos = len(self.data)
         if pos % self.p.modbuy == 0:
-            self.buy(self.datas[0], size=None)
+            if self.broker.getposition(self.datas[0]).size == 0:
+                self.buy(self.datas[0], size=None)
 
         if pos % self.p.modsell == 0:
-            self.sell(self.datas[0], size=None)
+            if self.broker.getposition(self.datas[0]).size > 0:
+                self.sell(self.datas[0], size=None)
 
 
 def _get_trading_calendar(open_hour, close_hour, close_minute):
@@ -55,36 +57,37 @@ def _run_resampler(data_timeframe,
     cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
-    cerebro.addlistener(PlotListener)
+    cerebro.addlistener(PlotListener, volume=False)
     
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
-    data = bt.feeds.FakeFeed(timeframe=data_timeframe,
-                             compression=data_compression,
-                             run_duration=datetime.timedelta(seconds=runtime_seconds),
-                             starting_value=starting_value,
-                             tick_interval=tick_interval,
-                             live=True,
-                             num_gen_bars=num_gen_bars,
-                             start_delay=0,
-                             name='data0',
-                             )
+    for i in range(0, 3):
+        data = bt.feeds.FakeFeed(timeframe=data_timeframe,
+                                 compression=data_compression,
+                                 run_duration=datetime.timedelta(seconds=runtime_seconds),
+                                 starting_value=starting_value,
+                                 tick_interval=tick_interval,
+                                 live=True,
+                                 num_gen_bars=num_gen_bars,
+                                 start_delay=0,
+                                 name=f'data{i}',
+                                 )
 
-    cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
+        cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
 
 
-    data2 = bt.feeds.FakeFeed(timeframe=data_timeframe,
-                              compression=data_compression,
-                              run_duration=datetime.timedelta(seconds=runtime_seconds),
-                              starting_value=starting_value,
-                              tick_interval=datetime.timedelta(seconds=11),
-                              live=True,
-                              num_gen_bars=num_gen_bars,
-                              start_delay=0,
-                              name='data2',
-                              )
-
-    cerebro.resampledata(data2, timeframe=resample_timeframe, compression=1)
+    # data2 = bt.feeds.FakeFeed(timeframe=data_timeframe,
+    #                           compression=data_compression,
+    #                           run_duration=datetime.timedelta(seconds=runtime_seconds),
+    #                           starting_value=starting_value,
+    #                           tick_interval=tick_interval, #datetime.timedelta(seconds=11),
+    #                           live=True,
+    #                           num_gen_bars=num_gen_bars,
+    #                           start_delay=0,
+    #                           name='data2',
+    #                           )
+    #
+    # cerebro.resampledata(data2, timeframe=resample_timeframe, compression=1)
 
     # return the recorded bars attribute from the first strategy
     res = cerebro.run()
@@ -95,8 +98,8 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
     cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
                                     data_compression=1,
-                                    resample_timeframe=bt.TimeFrame.Minutes,
-                                    resample_compression=1,
+                                    resample_timeframe=bt.TimeFrame.Seconds,
+                                    resample_compression=10,
                                     runtime_seconds=60000,
-                                    tick_interval=datetime.timedelta(seconds=80),
+                                    tick_interval=datetime.timedelta(seconds=1),
                                     )

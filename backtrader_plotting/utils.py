@@ -53,6 +53,7 @@ def convert_by_line_clock(line, line_clk, new_clk):
     if new_clk is None:
         return line
 
+    clk_offset = len(line_clk) - len(line)  # sometimes the clock has more data than the data line
     new_line = []
     next_start_idx = 0
     for sc in new_clk:
@@ -60,7 +61,12 @@ def convert_by_line_clock(line, line_clk, new_clk):
             v = line_clk[i]
             if sc == v:
                 # exact hit
-                new_line.append(line[i])
+                line_idx = i - clk_offset
+                if line_idx < 0:
+                    # data line is shorter so we don't have data
+                    new_line.append(float('nan'))
+                else:
+                    new_line.append(line[line_idx])
                 next_start_idx = i + 1
                 break
         else:

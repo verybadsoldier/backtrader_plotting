@@ -1,17 +1,13 @@
 import asyncio
 import logging
-from collections import defaultdict
 from threading import Lock
 from typing import Dict, Optional
-import numpy as np
 import threading
-
-from attr import dataclass
 
 import backtrader as bt
 
 from bokeh.io import curdoc
-from bokeh.models import ColumnDataSource, DataRange1d, Range1d
+from bokeh.models import ColumnDataSource
 from bokeh.document import Document
 
 from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
@@ -36,7 +32,7 @@ class PlotListener(bt.ListenerBase):
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
-        self._webapp = BokehWebapp('Live', "basic.html.j2", self.p.scheme, self._build_root_model, on_session_destroyed=self._on_session_destroyed)
+        self._webapp = BokehWebapp('Live', "basic.html.j2", self.p.scheme, self._bokeh_cb_build_root_model, on_session_destroyed=self._on_session_destroyed)
         self._lock = Lock()
         self._datastore = None
         self._clients: Dict[Document, LiveClient] = {}
@@ -52,12 +48,17 @@ class PlotListener(bt.ListenerBase):
             doc = curdoc()
             del self._clients[doc]
 
-    def _build_root_model(self, doc: Document):
-        client = LiveClient(self._push_adds, self._create_bokeh, self._cerebro.runningstrats[self.p.strategyidx], lookback=self.p.lookback)
+    def _bokeh_cb_build_root_model(self, doc: Document):
+        client = LiveClient(self._bokeh_cb_push_adds,
+                            self._create_bokeh,
+                            self._bokeh_cb_push_adds,
+                            self._cerebro.runningstrats[self.p.strategyidx],
+                            lookback=self.p.lookback)
+
         with self._lock:
             self._clients[doc] = client
 
-        self._push_adds(doc)
+        self._bokeh_cb_push_adds(doc)
 
         return client.model
 
@@ -78,7 +79,7 @@ class PlotListener(bt.ListenerBase):
         loop = tornado.ioloop.IOLoop.current()
         self._webapp.start(loop)
 
-    def _push_adds(self, bootstrap_document=None):
+    def _bokeh_cb_push_adds(self, bootstrap_document=None):
         if bootstrap_document is None:
             document = curdoc()
         else:
@@ -94,9 +95,9 @@ class PlotListener(bt.ListenerBase):
 
             updatepkg = ColumnDataSource.from_df(updatepkg_df)
 
-            client.push_adds(updatepkg, last_index=updatepkg_df['index'].iloc[-1])
+            client.push_adds(updatepkg, new_last_index=updatepkg_df['index'].iloc[-1])
 
-    def _push_patches(self):
+    def _bokeh_cb_push_patches(self):
         document = curdoc()
         with self._lock:
             client: LiveClient = self._clients[document]
@@ -130,29 +131,29 @@ class PlotListener(bt.ListenerBase):
                         # or both not NaN but different now
                         # and don't could it as True when both are NaN
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                            self._datastore[columnName].iloc[i] = d  # update data in datastore
+                            self._datastore.at[i, columnName] = d  # update data in datastore
                             for doc in self._clients.keys():
                                 if doc not in self._patch_pkgs:
                                     self._patch_pkgs[doc] = []
                                 self._patch_pkgs[doc].append((columnName, self._datastore['datetime'].iloc[i].to_datetime64(), fulldata[columnName][i]))
 
                 for doc in self._clients.keys():
-                    doc.add_next_tick_callback(self._push_patches)
+                    doc.add_next_tick_callback(self._bokeh_cb_push_patches)
         else:
             with self._lock:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
 
-            num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
-            new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
+                num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
+                new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
 
-            with self._lock:
-                self._datastore = self._datastore.append(new_frame)
+                # append data and remove old data
+                self._datastore = self._datastore.append(new_frame, ignore_index=True)
                 self._datastore = self._datastore.tail(self.p.lookback)
 
                 for doc in self._clients.keys() if doc is None else [doc]:
                     try:
-                        doc.remove_next_tick_callback(self._push_adds)
+                        doc.remove_next_tick_callback(self._bokeh_cb_push_adds)
                     except ValueError:
                         # there was no callback to remove
                         pass
-                    doc.add_next_tick_callback(self._push_adds)
+                    doc.add_next_tick_callback(self._bokeh_cb_push_adds)

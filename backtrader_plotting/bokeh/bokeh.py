@@ -51,7 +51,6 @@ class FigurePage(object):
         self.figure_envs: List[FigureEnvelope] = []
         self.strategy: Optional[bt.Strategy] = obj if isinstance(obj, bt.Strategy) else None
         self.cds: Optional[ColumnDataSource] = ColumnDataSource(data=dict(datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
-        self.data_columns: List[Tuple[str, object]] = []
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
@@ -136,11 +135,22 @@ class Bokeh(metaclass=bt.MetaParams):
             else:
                 raise RuntimeError(f'Unknown config type in plotting config: {k}')
 
-    def _build_graph(self, datas, inds, obs) -> Tuple[Dict, List]:
+    def list_logicgroups(self, strategy: bt.Strategy):
+        data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
+
+        lgs = list()
+        for master in itertools.chain(data_graph.keys(), volume_graph):
+            lg = FigureEnvelope._resolve_logicgroup(master)
+            if isinstance(lg, str) and lg not in lgs:
+                lgs.append(lg)
+
+        return lgs
+
+    def _build_graph(self, datas, inds, obs, logicgroup=None) -> Tuple[Dict, List]:
         data_graph = {}
         volume_graph = []
         for d in datas:
-            if not d.plotinfo.plot:
+            if not d.plotinfo.plot or not FigureEnvelope.should_filter_by_logicgroup(d, logicgroup):
                 continue
 
             pmaster = Bokeh._resolve_plotmaster(d.plotinfo.plotmaster)
@@ -160,7 +170,7 @@ class Bokeh(metaclass=bt.MetaParams):
                 continue
 
             # should this indicator be plotted?
-            if not obj.plotinfo.plot or obj.plotinfo.plotskip:
+            if not obj.plotinfo.plot or obj.plotinfo.plotskip or not FigureEnvelope.should_filter_by_logicgroup(obj, logicgroup):
                 continue
 
             # subplot = create a new figure for this indicator
@@ -213,13 +223,13 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return start, end
 
-    def _blueprint_strategy(self, strategy: bt.Strategy, start=None, end=None, **kwargs) -> None:
+    def _blueprint_strategy(self, strategy: bt.Strategy, start=None, end=None, logicgroup=None, **kwargs) -> None:
         if not strategy.datas:
             return
 
         self._cur_figurepage.analyzers += [a for _, a in strategy.analyzers.getitems()]
 
-        data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
+        data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers(), logicgroup)
 
         start, end = Bokeh._get_start_end(strategy, start, end)
 
@@ -229,7 +239,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_figures = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, self._cur_figurepage.data_columns, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
+            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
 
             figure.plot(master, None)
 
@@ -324,17 +334,6 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
-    def _update_cds(self, fp: FigurePage):
-        # create an approproate cds for this possibly filtered (by logicgroup) model
-        for name in list(fp.cds.data):
-            fp.cds.remove(name)
-
-        fp.cds.add(np.array([], dtype=np.datetime64), 'datetime')
-        fp.cds.add(np.array([], dtype=np.float64), 'index')
-
-        for name, dtype in fp.data_columns:
-            fp.cds.add(np.array([], dtype=dtype), name)
-
     def _generate_model_tabs(self, fp: FigurePage, logicgroup=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
@@ -357,13 +356,13 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # 3. filter logicgroups
         if logicgroup is not None:
-            filtered = set()
+            filtered = []
             for f in sorted_figs:
                 lgs = f.get_logicgroups()
                 for lg in lgs:
                     if lg is True or lg == logicgroup:
-                        filtered.add(f)
-            sorted_figs = list(filtered)
+                        filtered.append(f)
+            sorted_figs = filtered
 
         sorted_figs.sort(key=lambda x: x.plottab)
         tabgroups = itertools.groupby(sorted_figs, lambda x: x.plottab)
@@ -482,7 +481,7 @@ class Bokeh(metaclass=bt.MetaParams):
         return strategydf
 
     #  region interface for backtrader
-    def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, fill_data=True, **kwargs):
+    def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, fill_data=True, logicgroup=None, **kwargs):
         """Called by backtrader to plot either a strategy or an optimization result."""
 
         # prepare new FigurePage
@@ -503,12 +502,12 @@ class Bokeh(metaclass=bt.MetaParams):
         self._iplot = iplot and 'ipykernel' in sys.modules
 
         if isinstance(obj, bt.Strategy):
-            self._blueprint_strategy(obj, start, end, **kwargs)
+            self._blueprint_strategy(obj, start, end, logicgroup, **kwargs)
             if fill_data:
                 df: pd.DataFrame = self.build_strategy_data(obj, start, end)
 
-                fp.cds = ColumnDataSource.from_df(df)
-                # append_cds(fp.cds, new_cds)
+                new_cds = ColumnDataSource.from_df(df)
+                append_cds(fp.cds, new_cds)
         elif isinstance(obj, bt.OptReturn):
             # for optresults we only plot analyzers!
             self._cur_figurepage.analyzers += [a for _, a in obj.analyzers.getitems()]

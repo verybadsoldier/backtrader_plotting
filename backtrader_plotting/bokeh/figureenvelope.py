@@ -108,7 +108,28 @@ class HoverContainer(metaclass=bt.MetaParams):
 class FigureEnvelope(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, data_columns: List[Tuple[str, object]], hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
+    _mrk_fncs = {'^': 'triangle',
+                 'v': 'inverted_triangle',
+                 'o': 'circle',
+                 '<': 'circle_cross',
+                 '>': 'circle_x',
+                 '1': 'diamond',
+                 '2': 'diamond_cross',
+                 '3': 'hex',
+                 '4': 'square',
+                 '8': 'square_cross',
+                 's': 'square_x',
+                 'p': 'triangle',
+                 '*': 'asterisk',
+                 'h': 'hex',
+                 'H': 'hex',
+                 '+': 'asterisk',
+                 'x': 'x',
+                 'D': 'diamond_cross',
+                 'd': 'diamond',
+                 }
+
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._scheme = scheme
@@ -126,10 +147,20 @@ class FigureEnvelope(object):
         self._is_multidata = is_multidata
         self._logicgroup = None
         self._init_figure()
-        self._data_columns = data_columns
 
     @staticmethod
-    def _resolve_logicgroup(obj):
+    def should_filter_by_logicgroup(obj, logicgroup):
+        if logicgroup is None:
+            return True
+
+        if isinstance(logicgroup, str):
+            logicgroup = [logicgroup]
+
+        obj_lg = FigureEnvelope._resolve_logicgroup(obj)
+        return obj_lg is True or obj_lg in logicgroup
+
+    @staticmethod
+    def _resolve_logicgroup(obj) -> Union[bool, str]:
         if isinstance(obj, bt.AbstractDataBase):
             # data feeds are end points
             return obj._name
@@ -324,7 +355,7 @@ class FigureEnvelope(object):
 
     def _add_columns(self, cols: List[Tuple[str, object]]):
         for name, dtype in cols:
-            self._data_columns.append((name, dtype))
+            self._cds.add(np.array([], dtype=dtype), name)
 
     def plot_data(self, data: bt.AbstractDataBase):
         source_id = FigureEnvelope._source_id(data)
@@ -466,30 +497,10 @@ class FigureEnvelope(object):
                 kwglyphs['color'] = color
                 kwglyphs['y'] = source_id
 
-                mrk_fncs = {'^': self.figure.triangle,
-                            'v': self.figure.inverted_triangle,
-                            'o': self.figure.circle,
-
-                            '<': self.figure.circle_cross,
-                            '>': self.figure.circle_x,
-                            '1': self.figure.diamond,
-                            '2': self.figure.diamond_cross,
-                            '3': self.figure.hex,
-                            '4': self.figure.square,
-                            '8': self.figure.square_cross,
-                            's': self.figure.square_x,
-                            'p': self.figure.triangle,
-                            '*': self.figure.asterisk,
-                            'h': self.figure.hex,
-                            'H': self.figure.hex,
-                            '+': self.figure.asterisk,
-                            'x': self.figure.x,
-                            'D': self.figure.diamond_cross,
-                            'd': self.figure.diamond,
-                            }
-                if marker not in mrk_fncs:
+                if marker not in FigureEnvelope._mrk_fncs:
                     raise Exception(f"Sorry, unsupported marker: '{marker}'. Please report to GitHub.")
-                glyph_fnc = mrk_fncs[marker]
+                glyph_fnc_name = FigureEnvelope._mrk_fncs[marker]
+                glyph_fnc = getattr(self.figure, glyph_fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'

@@ -364,7 +364,8 @@ class FigureEnvelope(object):
         # append to title
         self._figure_append_title(title)
 
-        self._add_columns([(source_id + x, object) for x in ['open', 'high', 'low', 'close', 'colors_bars', 'colors_wicks', 'colors_outline']])
+        self._add_columns([(source_id + x, object) for x in ['open', 'high', 'low', 'close']])
+        self._add_columns([(source_id + x, str) for x in ['colors_bars', 'colors_wicks', 'colors_outline']])
 
         if self._scheme.style == 'line':
             if data.plotinfo.plotmaster is None:

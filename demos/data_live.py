@@ -50,44 +50,40 @@ def _run_resampler(data_timeframe,
                    runtime_seconds=27,
                    starting_value=200,
                    tick_interval=datetime.timedelta(seconds=11),
-                   num_gen_bars=0,
+                   num_gen_bars=None,
+                   start_delays=None,
+                   num_data=1,
                    ) -> bt.Strategy:
     _logger.info("Constructing Cerebro")
     cerebro = bt.Cerebro()
     cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
-    cerebro.addlistener(PlotListener, volume=False)
-    
+    cerebro.addlistener(PlotListener, volume=False, lookback=3)
+
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
-    for i in range(0, 3):
+    for i in range(0, num_data):
+        start_delay = 0
+        if start_delays is not None and i <= len(start_delays) and start_delays[i] is not None:
+            start_delay = start_delays[i]
+
+        num_gen_bar = 0
+        if num_gen_bars is not None and i <= len(num_gen_bars) and num_gen_bars[i] is not None:
+            num_gen_bar = num_gen_bars[i]
+
         data = bt.feeds.FakeFeed(timeframe=data_timeframe,
                                  compression=data_compression,
                                  run_duration=datetime.timedelta(seconds=runtime_seconds),
                                  starting_value=starting_value,
                                  tick_interval=tick_interval,
                                  live=True,
-                                 num_gen_bars=num_gen_bars,
-                                 start_delay=0,
+                                 num_gen_bars=num_gen_bar,
+                                 start_delay=start_delay,
                                  name=f'data{i}',
                                  )
 
         cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
-
-
-    # data2 = bt.feeds.FakeFeed(timeframe=data_timeframe,
-    #                           compression=data_compression,
-    #                           run_duration=datetime.timedelta(seconds=runtime_seconds),
-    #                           starting_value=starting_value,
-    #                           tick_interval=tick_interval, #datetime.timedelta(seconds=11),
-    #                           live=True,
-    #                           num_gen_bars=num_gen_bars,
-    #                           start_delay=0,
-    #                           name='data2',
-    #                           )
-    #
-    # cerebro.resampledata(data2, timeframe=resample_timeframe, compression=1)
 
     # return the recorded bars attribute from the first strategy
     res = cerebro.run()
@@ -102,4 +98,7 @@ if __name__ == '__main__':
                                     resample_compression=10,
                                     runtime_seconds=60000,
                                     tick_interval=datetime.timedelta(seconds=1),
+                                    start_delays=[None, 30],
+                                    num_gen_bars=[0, 10],
+                                    num_data=2,
                                     )

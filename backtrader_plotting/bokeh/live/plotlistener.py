@@ -116,11 +116,14 @@ class PlotListener(bt.ListenerBase):
             with self._lock:
                 fulldata = self._bokeh.build_strategy_data(strategy)
 
+                # generate series with number of missing values per column
                 new_count = fulldata.isnull().sum()
                 cur_count = self._datastore.isnull().sum()
 
+                # boolean series that indicates which column is missing data
                 patched_cols = new_count != cur_count
 
+                # get dataframe with only those columns that added data
                 patchcols = fulldata[fulldata.columns[patched_cols]]
                 for columnName, columnData in patchcols.iteritems():
                     # compare all values in this column
@@ -129,7 +132,7 @@ class PlotListener(bt.ListenerBase):
                         # if value is different then put to patch package
                         # either it WAS NaN and it's not anymore
                         # or both not NaN but different now
-                        # and don't could it as True when both are NaN
+                        # and don't count it as True when both are NaN
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
                             self._datastore.at[i, columnName] = d  # update data in datastore
                             for doc in self._clients.keys():

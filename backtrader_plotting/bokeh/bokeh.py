@@ -457,6 +457,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
         indices = list(range(startidx, startidx + len(dtline)))
         strategydf['datetime'] = dtline
+        strategydf.set_index('datetime', inplace=True, drop=False)
         strategydf['index'] = indices
 
         for data in strategy.datas:

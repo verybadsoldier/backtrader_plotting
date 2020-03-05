@@ -5,7 +5,7 @@ from typing import Dict, Optional, List, Union
 
 import backtrader as bt
 
-import pandas
+import pandas as pd
 import itertools
 
 
@@ -74,10 +74,10 @@ def convert_by_line_clock(line, line_clk, new_clk):
     return new_line
 
 
-def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pandas.DataFrame:
+def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
     lines_clk = obj.lines.datetime.plotrange(start, end)
 
-    df = pandas.DataFrame()
+    df = pd.DataFrame()
     # iterate all lines
     for lineidx in range(obj.size()):
         line = obj.lines[lineidx]
@@ -93,6 +93,9 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
         df[name_prefix + linealias] = ndata
 
     df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
+
+    df.set_index(name_prefix + 'datetime', drop=False, inplace=True)
+
     return df
 
 

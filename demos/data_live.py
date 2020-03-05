@@ -59,7 +59,7 @@ def _run_resampler(data_timeframe,
     cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
-    cerebro.addlistener(PlotListener, volume=False, lookback=3)
+    cerebro.addlistener(PlotListener, volume=False)#, lookback=3)
 
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 

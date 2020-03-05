@@ -4,6 +4,8 @@ from threading import Lock
 from typing import Dict, Optional
 import threading
 
+import numpy as np
+
 import backtrader as bt
 
 from bokeh.io import curdoc
@@ -125,20 +127,21 @@ class PlotListener(bt.ListenerBase):
 
                 # get dataframe with only those columns that added data
                 patchcols = fulldata[fulldata.columns[patched_cols]]
-                for columnName, columnData in patchcols.iteritems():
-                    # compare all values in this column
-                    for i, d in enumerate(columnData):
-                        od = self._datastore[columnName].iloc[i]
+                for columnName in patchcols.columns:
+                    for index, row in self._datastore.iterrows():
+                        # compare all values in this column
+                        od = row[columnName]
+                        d = fulldata[columnName][index]
                         # if value is different then put to patch package
                         # either it WAS NaN and it's not anymore
                         # or both not NaN but different now
                         # and don't count it as True when both are NaN
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                            self._datastore.at[i, columnName] = d  # update data in datastore
+                            self._datastore.at[index, columnName] = d  # update data in datastore
                             for doc in self._clients.keys():
                                 if doc not in self._patch_pkgs:
                                     self._patch_pkgs[doc] = []
-                                self._patch_pkgs[doc].append((columnName, self._datastore['datetime'].iloc[i].to_datetime64(), fulldata[columnName][i]))
+                                self._patch_pkgs[doc].append((columnName, index, d))
 
                 for doc in self._clients.keys():
                     doc.add_next_tick_callback(self._bokeh_cb_push_patches)
@@ -149,8 +152,10 @@ class PlotListener(bt.ListenerBase):
                 num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
                 new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
 
+                assert new_frame['datetime'][0] != np.datetime64('NaT')
+
                 # append data and remove old data
-                self._datastore = self._datastore.append(new_frame, ignore_index=True)
+                self._datastore = self._datastore.append(new_frame)
                 self._datastore = self._datastore.tail(self.p.lookback)
 
                 for doc in self._clients.keys() if doc is None else [doc]:

@@ -166,7 +166,7 @@ def test_backtest_2strats(cerebro: bt.Cerebro):
 
     assert len(figs) == 2
     assert_num_tabs(figs, 3, 3)
-    assert_num_figures(figs, 4, 4)
+    assert_num_figures(figs, 4, 3)
 
 
 def test_optimize(cerebro: bt.Cerebro):

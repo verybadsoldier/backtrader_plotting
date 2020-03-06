@@ -145,49 +145,49 @@ class FigureEnvelope(object):
         self.plotorder = plotorder
         self.datas = []  # list of all datas that have been plotted to this figure
         self._is_multidata = is_multidata
-        self._logicgroup = None
+        self._tradingdomain = None
         self._init_figure()
 
     @staticmethod
-    def should_filter_by_logicgroup(obj, logicgroup):
-        if logicgroup is None:
+    def should_filter_by_tradingdomain(obj, tradingdomain):
+        if tradingdomain is None:
             return True
 
-        if isinstance(logicgroup, str):
-            logicgroup = [logicgroup]
+        if isinstance(tradingdomain, str):
+            tradingdomain = [tradingdomain]
 
-        obj_lg = FigureEnvelope._resolve_logicgroup(obj)
-        return obj_lg is True or obj_lg in logicgroup
+        obj_lg = FigureEnvelope._resolve_tradingdomain(obj)
+        return obj_lg is True or obj_lg in tradingdomain
 
     @staticmethod
-    def _resolve_logicgroup(obj) -> Union[bool, str]:
+    def _resolve_tradingdomain(obj) -> Union[bool, str]:
         if isinstance(obj, bt.AbstractDataBase):
             # data feeds are end points
             return obj._name
         elif isinstance(obj, bt.IndicatorBase):
             # lets find the data the indicator is based on
             data = get_indicator_data(obj)
-            return FigureEnvelope._resolve_logicgroup(data)
+            return FigureEnvelope._resolve_tradingdomain(data)
         elif isinstance(obj, bt.ObserverBase):
             if isinstance(obj._clock, bt.AbstractDataBase):
-                return FigureEnvelope._resolve_logicgroup(obj._clock)
+                return FigureEnvelope._resolve_tradingdomain(obj._clock)
             else:
                 return True  # for wide observers we return True which means it belongs to all logic groups
         else:
             raise Exception('unsupported')
 
-    def get_logicgroups(self) -> List[str]:
-        logicgroups = []
-        if self._logicgroup is None:
-            logicgroups.append(self._resolve_logicgroup(self.master))
-        elif isinstance(self._logicgroup, list):
-            logicgroups += self._logicgroup
-        elif isinstance(self._logicgroup, str):
-            logicgroups.append(self._logicgroup)
+    def get_tradingdomains(self) -> List[str]:
+        tradingdomains = []
+        if self._tradingdomain is None:
+            tradingdomains.append(self._resolve_tradingdomain(self.master))
+        elif isinstance(self._tradingdomain, list):
+            tradingdomains += self._tradingdomain
+        elif isinstance(self._tradingdomain, str):
+            tradingdomains.append(self._tradingdomain)
         else:
-            raise Exception(f'Invalid type for logicgroup: {type(self._logicgroup)}')
+            raise Exception(f'Invalid type for tradingdomain: {type(self._tradingdomain)}')
 
-        return logicgroups
+        return tradingdomains
 
     def _set_single_hover_renderer(self, ren: Renderer):
         """Sets this figure's hover to a single renderer"""
@@ -316,10 +316,10 @@ class FigureEnvelope(object):
             if order is not None:
                 self.plotorder = order
 
-            # just store the logicgroup of the master for later reference
-            logicgroup = getattr(obj.plotinfo, 'logicgroup', None)
-            if logicgroup is not None:
-                self._logicgroup = logicgroup
+            # just store the tradingdomain of the master for later reference
+            tradingdomain = getattr(obj.plotinfo, 'tradingdomain', None)
+            if tradingdomain is not None:
+                self._tradingdomain = tradingdomain
 
         self.datas.append(obj)
 

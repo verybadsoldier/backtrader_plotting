@@ -54,11 +54,11 @@ class FigurePage(object):
         self.analyzers: List[bt.Analyzer, bt.MetaStrategy, Optional[bt.AutoInfoClass]] = []
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
-    def get_logicgroups(self) -> List[str]:
-        logicgroups = set()
+    def get_tradingdomains(self) -> List[str]:
+        tradingdomain = set()
         for fe in self.figure_envs:
-            logicgroups = logicgroups.union(fe.get_logicgroups())
-        return list(logicgroups)
+            tradingdomain = tradingdomain.union(fe.get_tradingdomains())
+        return list(tradingdomain)
 
 
 class Bokeh(metaclass=bt.MetaParams):
@@ -135,22 +135,22 @@ class Bokeh(metaclass=bt.MetaParams):
             else:
                 raise RuntimeError(f'Unknown config type in plotting config: {k}')
 
-    def list_logicgroups(self, strategy: bt.Strategy):
+    def list_tradingdomains(self, strategy: bt.Strategy):
         data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
 
         lgs = list()
         for master in itertools.chain(data_graph.keys(), volume_graph):
-            lg = FigureEnvelope._resolve_logicgroup(master)
+            lg = FigureEnvelope._resolve_tradingdomain(master)
             if isinstance(lg, str) and lg not in lgs:
                 lgs.append(lg)
 
         return lgs
 
-    def _build_graph(self, datas, inds, obs, logicgroup=None) -> Tuple[Dict, List]:
+    def _build_graph(self, datas, inds, obs, tradingdomain=None) -> Tuple[Dict, List]:
         data_graph = {}
         volume_graph = []
         for d in datas:
-            if not d.plotinfo.plot or not FigureEnvelope.should_filter_by_logicgroup(d, logicgroup):
+            if not d.plotinfo.plot or not FigureEnvelope.should_filter_by_tradingdomain(d, tradingdomain):
                 continue
 
             pmaster = Bokeh._resolve_plotmaster(d.plotinfo.plotmaster)
@@ -170,7 +170,7 @@ class Bokeh(metaclass=bt.MetaParams):
                 continue
 
             # should this indicator be plotted?
-            if not obj.plotinfo.plot or obj.plotinfo.plotskip or not FigureEnvelope.should_filter_by_logicgroup(obj, logicgroup):
+            if not obj.plotinfo.plot or obj.plotinfo.plotskip or not FigureEnvelope.should_filter_by_tradingdomain(obj, tradingdomain):
                 continue
 
             # subplot = create a new figure for this indicator
@@ -223,13 +223,13 @@ class Bokeh(metaclass=bt.MetaParams):
 
         return start, end
 
-    def _blueprint_strategy(self, strategy: bt.Strategy, start=None, end=None, logicgroup=None, **kwargs) -> None:
+    def _blueprint_strategy(self, strategy: bt.Strategy, start=None, end=None, tradingdomain=None, **kwargs) -> None:
         if not strategy.datas:
             return
 
         self._cur_figurepage.analyzers += [a for _, a in strategy.analyzers.getitems()]
 
-        data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers(), logicgroup)
+        data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers(), tradingdomain)
 
         start, end = Bokeh._get_start_end(strategy, start, end)
 
@@ -334,7 +334,7 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
-    def _generate_model_tabs(self, fp: FigurePage, logicgroup=None) -> List[Panel]:
+    def _generate_model_tabs(self, fp: FigurePage, tradingdomain=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
         inds = [x for x in fp.figure_envs if isinstance(x.master, bt.Indicator)]
@@ -354,13 +354,13 @@ class Bokeh(metaclass=bt.MetaParams):
         # groupby expects the groups to be sorted or else will produce duplicated groups
         sorted_figs = list(itertools.chain(datas, inds, observers))
 
-        # 3. filter logicgroups
-        if logicgroup is not None:
+        # 3. filter tradingdomains
+        if tradingdomain is not None:
             filtered = []
             for f in sorted_figs:
-                lgs = f.get_logicgroups()
+                lgs = f.get_tradingdomains()
                 for lg in lgs:
-                    if lg is True or lg == logicgroup:
+                    if lg is True or lg == tradingdomain:
                         filtered.append(f)
             sorted_figs = filtered
 
@@ -482,7 +482,7 @@ class Bokeh(metaclass=bt.MetaParams):
         return strategydf
 
     #  region interface for backtrader
-    def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, fill_data=True, logicgroup=None, **kwargs):
+    def plot(self, obj: Union[bt.Strategy, bt.OptReturn], figid=0, numfigs=1, iplot=True, start=None, end=None, use=None, fill_data=True, tradingdomain=None, **kwargs):
         """Called by backtrader to plot either a strategy or an optimization result."""
 
         # prepare new FigurePage
@@ -503,7 +503,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._iplot = iplot and 'ipykernel' in sys.modules
 
         if isinstance(obj, bt.Strategy):
-            self._blueprint_strategy(obj, start, end, logicgroup, **kwargs)
+            self._blueprint_strategy(obj, start, end, tradingdomain, **kwargs)
             if fill_data:
                 df: pd.DataFrame = self.build_strategy_data(obj, start, end)
 

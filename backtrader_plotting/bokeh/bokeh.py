@@ -451,14 +451,14 @@ class Bokeh(metaclass=bt.MetaParams):
 
         strat_clk = strat_clk[-num_back:]
 
-        # we use timezone of first data
+        # we use timezone of first data. we might see duplicated timestamps here
         dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in strat_clk]
 
         # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
         indices = list(range(startidx, startidx + len(dtline)))
-        strategydf['datetime'] = dtline
-        strategydf.set_index('datetime', inplace=True, drop=False)
         strategydf['index'] = indices
+
+        strategydf['datetime'] = dtline
 
         for data in strategy.datas:
             source_id = FigureEnvelope._source_id(data)

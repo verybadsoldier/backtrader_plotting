@@ -94,8 +94,6 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
 
     df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
 
-    df.set_index(name_prefix + 'datetime', drop=False, inplace=True)
-
     return df
 
 

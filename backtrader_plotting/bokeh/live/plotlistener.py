@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import logging
 from threading import Lock
 from typing import Dict, Optional
@@ -40,7 +41,7 @@ class PlotListener(bt.ListenerBase):
         self._clients: Dict[Document, LiveClient] = {}
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
-        self._patch_pkgs = {}
+        self._patch_pkgs = defaultdict(lambda: [])
 
     def _create_bokeh(self):
         return Bokeh(style=self.p.style, **self._bokeh_kwargs)
@@ -131,7 +132,12 @@ class PlotListener(bt.ListenerBase):
                     for index, row in self._datastore.iterrows():
                         # compare all values in this column
                         od = row[columnName]
+                        odt = row['datetime']
                         d = fulldata[columnName][index]
+                        dt = fulldata['datetime'][index]
+
+                        assert odt == dt
+
                         # if value is different then put to patch package
                         # either it WAS NaN and it's not anymore
                         # or both not NaN but different now
@@ -139,9 +145,7 @@ class PlotListener(bt.ListenerBase):
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
                             self._datastore.at[index, columnName] = d  # update data in datastore
                             for doc in self._clients.keys():
-                                if doc not in self._patch_pkgs:
-                                    self._patch_pkgs[doc] = []
-                                self._patch_pkgs[doc].append((columnName, index, d))
+                                self._patch_pkgs[doc].append((columnName, odt, d))
 
                 for doc in self._clients.keys():
                     doc.add_next_tick_callback(self._bokeh_cb_push_patches)
@@ -152,10 +156,11 @@ class PlotListener(bt.ListenerBase):
                 num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
                 new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
 
-                assert new_frame['datetime'][0] != np.datetime64('NaT')
+                # i have seen an empty line in the past. let's catch it here
+                assert new_frame['datetime'].iloc[0] != np.datetime64('NaT')
 
                 # append data and remove old data
-                self._datastore = self._datastore.append(new_frame)
+                self._datastore = self._datastore.append(new_frame, ignore_index=True)
                 self._datastore = self._datastore.tail(self.p.lookback)
 
                 for doc in self._clients.keys() if doc is None else [doc]:

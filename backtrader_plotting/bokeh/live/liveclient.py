@@ -154,7 +154,7 @@ class LiveClient:
             colname, dt, val = pp
             if colname not in cds.data:
                 continue
-            idx = dt_idx_map[dt]
+            idx = dt_idx_map[dt.to_datetime64()]
             patch_dict[colname].append((idx, val))
         _logger.info(f"Sending patch dict: {patch_dict}")
 

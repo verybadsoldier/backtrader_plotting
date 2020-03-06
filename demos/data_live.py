@@ -91,7 +91,7 @@ def _run_resampler(data_timeframe,
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.INFO)
     cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
                                     data_compression=1,
                                     resample_timeframe=bt.TimeFrame.Seconds,

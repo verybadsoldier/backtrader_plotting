@@ -342,17 +342,17 @@ class FigureEnvelope(object):
         nan_ref = df[col_open]
 
         # TODO: we want to have NaN values in the color lines if the corresponding data is also NaN
-        # find better way withl ess isnan usage
+        # find better way with less isnan usage
 
-        color_df = pd.DataFrame(dtype=str, index=df.index)
+        color_df = pd.DataFrame(index=df.index)
         color_df[col_prefix + 'colors_bars'] = [np.nan if np.isnan(n) else colorup if x else colordown for x, n in zip(is_up, nan_ref)]
         color_df[col_prefix + 'colors_wicks'] = [np.nan if np.isnan(n) else colorup_wick if x else colordown_wick for x, n in zip(is_up, nan_ref)]
         color_df[col_prefix + 'colors_outline'] = [np.nan if np.isnan(n) else colorup_outline if x else colordown_outline for x, n in zip(is_up, nan_ref)]
         color_df[col_prefix + 'colors_volume'] = [np.nan if np.isnan(n) else volup if x else voldown for x, n in zip(is_up, nan_ref)]
 
-        # convert to strings since color values are strings
+        # convert to object since we want to hold str and NaN
         for c in color_df.columns:
-            color_df[c] = color_df[c].astype(str)
+            color_df[c] = color_df[c].astype(object)
 
         return color_df
 

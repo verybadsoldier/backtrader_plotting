@@ -44,7 +44,7 @@ class PlotListener(bt.ListenerBase):
         self._patch_pkgs = defaultdict(lambda: [])
 
     def _create_bokeh(self):
-        return Bokeh(style=self.p.style, **self._bokeh_kwargs)
+        return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)
 
     def _on_session_destroyed(self, session_context):
         with self._lock:

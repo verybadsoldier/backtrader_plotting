@@ -2,8 +2,8 @@ from .scheme import Scheme
 
 
 class Blackly(Scheme):
-    def __init__(self):
-        super().__init__()
+    def _set_params(self):
+        super()._set_params()
 
         self.crosshair_line_color = '#999999'
 

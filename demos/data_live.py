@@ -4,9 +4,11 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import datetime
+import logging
 
 import backtrader as bt
-import logging
+
+from backtrader_plotting.schemes import Blackly
 
 try:
     from backtrader_plotting.bokeh.live.plotlistener import PlotListener
@@ -59,7 +61,8 @@ def _run_resampler(data_timeframe,
     cerebro.addstrategy(LiveDemoStrategy)
 
     cerebro.addlistener(bt.listeners.RecorderListener)
-    cerebro.addlistener(PlotListener, volume=False)#, lookback=3)
+
+    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'))#, lookback=3)
 
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 

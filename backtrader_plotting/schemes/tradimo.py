@@ -2,8 +2,8 @@ from .blackly import Blackly
 
 
 class Tradimo(Blackly):
-    def __init__(self):
-        super().__init__()
+    def _set_params(self):
+        super()._set_params()
 
         dark_text = "#333333"
 

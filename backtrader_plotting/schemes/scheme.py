@@ -2,9 +2,12 @@ from backtrader.plot.scheme import PlotScheme as _BtPlotScheme
 
 
 class Scheme(_BtPlotScheme):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
+        self._set_params()
+        self._set_args(**kwargs)
 
+    def _set_params(self):
         """
         hover tooltips of datas will contain all other datas and all indicators/observers
         if set to False then tooltips of datas will only contain the current data and indicators/observers related to that data
@@ -68,12 +71,19 @@ class Scheme(_BtPlotScheme):
         self.number_format_volume = '0.00 a'
 
         # https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html
-        self.axis_tickformat_minutes = ":%M"
-        self.axis_tickformat_hourmin = "%H:%M"
-        self.axis_tickformat_hours = "%d %b %R"
-
         self.axis_tickformat_days = "%d %b %R"
-        self.axis_tickformat_months = "%D"
+        self.axis_tickformat_hourmin = "%H:%M:%S"
+        self.axis_tickformat_hours = "%d %b %R"
+        self.axis_tickformat_minsec = "%H:%M:%S"
+        self.axis_tickformat_minutes = "%H:%M"
+        self.axis_tickformat_months = "%d/%m/%y"
+        self.axis_tickformat_seconds = "%H:%M:%S"
         self.axis_tickformat_years = "%Y %b"
 
         self.y_range_padding = 0.5  # used to add padding on the y-axis for all data except volume
+
+    def _set_args(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k):
+                raise Exception(f'Invalid scheme parameter "{k}')
+            setattr(self, k, v)

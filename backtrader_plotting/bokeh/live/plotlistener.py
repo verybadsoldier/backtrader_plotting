@@ -30,12 +30,18 @@ class PlotListener(bt.ListenerBase):
         ('scheme', Blackly()),
         ('style', 'bar'),
         ('lookback', 23),
-        ('strategyidx', 0)
+        ('strategyidx', 0),
+        ('http_port', 80),
     )
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
-        self._webapp = BokehWebapp('Live', "basic.html.j2", self.p.scheme, self._bokeh_cb_build_root_model, on_session_destroyed=self._on_session_destroyed)
+        self._webapp = BokehWebapp('Live',
+                                   'basic.html.j2',
+                                   self.p.scheme,
+                                   self._bokeh_cb_build_root_model,
+                                   on_session_destroyed=self._on_session_destroyed,
+                                   port=self.p.http_port)
         self._lock = Lock()
         self._datastore = None
         self._clients: Dict[Document, LiveClient] = {}

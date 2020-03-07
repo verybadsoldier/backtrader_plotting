@@ -50,7 +50,7 @@ class BokehWebapp:
         else:
             apps = {'/': app}
 
-            print("Open your browser here: http://localhost")
+            print(f"Open your browser here: http://localhost:{port}")
             server = Server(apps, port=port, io_loop=ioloop)
             if ioloop is None:
                 server.run_until_shutdown()

@@ -62,7 +62,7 @@ def _run_resampler(data_timeframe,
 
     cerebro.addlistener(bt.listeners.RecorderListener)
 
-    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'))#, lookback=3)
+    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'), lookback=120)
 
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 

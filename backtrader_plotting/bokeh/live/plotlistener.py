@@ -72,6 +72,8 @@ class PlotListener(bt.ListenerBase):
         return client.model
 
     def start(self, cerebro):
+        _logger.info("Starting PlotListener...")
+
         self._cerebro = cerebro
 
         self._datastore = self._bokeh.build_strategy_data(self._cerebro.runningstrats[self.p.strategyidx])
@@ -134,12 +136,12 @@ class PlotListener(bt.ListenerBase):
 
                 # get dataframe with only those columns that added data
                 patchcols = fulldata[fulldata.columns[patched_cols]]
-                for columnName in patchcols.columns:
+                for column_name in patchcols.columns:
                     for index, row in self._datastore.iterrows():
                         # compare all values in this column
-                        od = row[columnName]
+                        od = row[column_name]
                         odt = row['datetime']
-                        d = fulldata[columnName][index]
+                        d = fulldata[column_name][index]
                         dt = fulldata['datetime'][index]
 
                         assert odt == dt
@@ -149,9 +151,9 @@ class PlotListener(bt.ListenerBase):
                         # or both not NaN but different now
                         # and don't count it as True when both are NaN
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                            self._datastore.at[index, columnName] = d  # update data in datastore
+                            self._datastore.at[index, column_name] = d  # update data in datastore
                             for doc in self._clients.keys():
-                                self._patch_pkgs[doc].append((columnName, odt, d))
+                                self._patch_pkgs[doc].append((column_name, odt, d))
 
                 for doc in self._clients.keys():
                     doc.add_next_tick_callback(self._bokeh_cb_push_patches)
@@ -166,7 +168,7 @@ class PlotListener(bt.ListenerBase):
                 assert new_frame['datetime'].iloc[0] != np.datetime64('NaT')
 
                 # append data and remove old data
-                self._datastore = self._datastore.append(new_frame, ignore_index=True)
+                self._datastore = self._datastore.append(new_frame)
                 self._datastore = self._datastore.tail(self.p.lookback)
 
                 for doc in self._clients.keys() if doc is None else [doc]:

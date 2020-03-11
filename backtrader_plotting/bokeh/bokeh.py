@@ -479,6 +479,9 @@ class Bokeh(metaclass=bt.MetaParams):
                 dataline = convert_by_line_clock(dataline, line_clk, strat_clk)
                 strategydf[source_id] = dataline
 
+        # apply a proper index (should be identical to 'index' column)
+        if strategydf.shape[0] > 0:
+            strategydf.index = indices
         return strategydf
 
     #  region interface for backtrader

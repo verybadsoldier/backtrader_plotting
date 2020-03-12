@@ -23,6 +23,8 @@ def paramval2str(name, value):
         return str(value)
     elif isinstance(value, list):
         return ','.join(value)
+    elif isinstance(value, tuple):
+        return ','.join(value)
     elif isinstance(value, type):
         return value.__name__
     else:

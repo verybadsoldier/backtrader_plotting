@@ -19,7 +19,7 @@ def paramval2str(name, value):
         return bt.TimeFrame.getname(value, 1)
     elif isinstance(value, float):
         return f"{value:.2f}"
-    elif isinstance(value, list):
+    elif isinstance(value, (list,tuple)):
         return ','.join(value)
     elif isinstance(value, type):
         return value.__name__

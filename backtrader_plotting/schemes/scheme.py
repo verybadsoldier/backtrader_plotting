@@ -1,4 +1,4 @@
-from backtrader.plot.scheme import PlotScheme as _BtPlotScheme
+from backtrader_plotting.schemes.btscheme import PlotScheme as _BtPlotScheme
 
 
 class Scheme(_BtPlotScheme):

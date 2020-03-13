@@ -15,6 +15,9 @@ Needs Python >= 3.6.
 ## Demos
 https://verybadsoldier.github.io/backtrader_plotting/
 
+## Installation
+`pip install backtrader_plotting`
+
 ## Quickstart
 
 ```python

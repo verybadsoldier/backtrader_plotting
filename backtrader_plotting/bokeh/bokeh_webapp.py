@@ -55,5 +55,6 @@ class BokehWebapp:
             if ioloop is None:
                 server.run_until_shutdown()
             else:
+                server.start()
                 ioloop.start()
 

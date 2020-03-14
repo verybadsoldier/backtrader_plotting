@@ -8,6 +8,7 @@ from bokeh.layouts import column, gridplot, row
 from bokeh.io import curdoc
 from bokeh.models.widgets import CheckboxGroup, Div, Select
 from bokeh.models import GridBox, DataRange1d
+from bokeh.document import Document
 
 from backtrader_plotting.html import metadata
 from backtrader_plotting.bokeh.bokeh import FigurePage
@@ -16,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 class LiveClient:
-    def __init__(self, push_fnc, bokeh_fac: callable, push_data_fnc:callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
+    def __init__(self, doc: Document, push_fnc, bokeh_fac: callable, push_data_fnc:callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
         self._slider = None
         self._push_data_fnc = push_data_fnc
         self._push_fnc = push_fnc
@@ -25,6 +26,7 @@ class LiveClient:
         self._lookback = lookback
         self._strategy = strategy
         self._current_group = None
+        self.document = doc
 
         self._bokeh_fac = bokeh_fac
         self._bokeh = None

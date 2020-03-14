@@ -44,7 +44,7 @@ class PlotListener(bt.ListenerBase):
                                    port=self.p.http_port)
         self._lock = Lock()
         self._datastore = None
-        self._clients: Dict[Document, LiveClient] = {}
+        self._clients: Dict[str, LiveClient] = {}
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
         self._patch_pkgs = defaultdict(lambda: [])
@@ -54,18 +54,18 @@ class PlotListener(bt.ListenerBase):
 
     def _on_session_destroyed(self, session_context):
         with self._lock:
-            doc = curdoc()
-            del self._clients[doc]
+            del self._clients[session_context.id]
 
     def _bokeh_cb_build_root_model(self, doc: Document):
-        client = LiveClient(self._bokeh_cb_push_adds,
+        client = LiveClient(doc,
+                            self._bokeh_cb_push_adds,
                             self._create_bokeh,
                             self._bokeh_cb_push_adds,
                             self._cerebro.runningstrats[self.p.strategyidx],
                             lookback=self.p.lookback)
 
         with self._lock:
-            self._clients[doc] = client
+            self._clients[doc.session_context.id] = client
 
         self._bokeh_cb_push_adds(doc)
 
@@ -97,7 +97,7 @@ class PlotListener(bt.ListenerBase):
             document = bootstrap_document
 
         with self._lock:
-            client = self._clients[document]
+            client = self._clients[document.session_context.id]
             updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
 
             # skip if we don't have new data
@@ -110,14 +110,15 @@ class PlotListener(bt.ListenerBase):
 
     def _bokeh_cb_push_patches(self):
         document = curdoc()
+        session_id = document.session_context.id
         with self._lock:
-            client: LiveClient = self._clients[document]
+            client: LiveClient = self._clients[session_id]
 
-            patch_pkgs = self._patch_pkgs[document]
-            self._patch_pkgs[document] = []
+            patch_pkgs = self._patch_pkgs[session_id]
+            self._patch_pkgs[session_id] = []
             client.push_patches(patch_pkgs)
 
-    def next(self, doc=None):
+    def next(self):
         strategy = self._cerebro.runningstrats[self.p.strategyidx]
 
         # treat as update of old data if strategy datetime is duplicated and we have already data stored
@@ -152,11 +153,11 @@ class PlotListener(bt.ListenerBase):
                         # and don't count it as True when both are NaN
                         if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
                             self._datastore.at[index, column_name] = d  # update data in datastore
-                            for doc in self._clients.keys():
-                                self._patch_pkgs[doc].append((column_name, odt, d))
+                            for sess_id in self._clients.keys():
+                                self._patch_pkgs[sess_id].append((column_name, odt, d))
 
-                for doc in self._clients.keys():
-                    doc.add_next_tick_callback(self._bokeh_cb_push_patches)
+                for client in self._clients.values():
+                    client.document.add_next_tick_callback(self._bokeh_cb_push_patches)
         else:
             with self._lock:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
@@ -171,7 +172,8 @@ class PlotListener(bt.ListenerBase):
                 self._datastore = self._datastore.append(new_frame)
                 self._datastore = self._datastore.tail(self.p.lookback)
 
-                for doc in self._clients.keys() if doc is None else [doc]:
+                for client in self._clients.values():
+                    doc = client.document
                     try:
                         doc.remove_next_tick_callback(self._bokeh_cb_push_adds)
                     except ValueError:

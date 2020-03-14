@@ -32,11 +32,12 @@ class PlotListener(bt.ListenerBase):
         ('lookback', 23),
         ('strategyidx', 0),
         ('http_port', 80),
+        ('title', 'Live'),
     )
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
-        self._webapp = BokehWebapp('Live',
+        self._webapp = BokehWebapp(self.p.title,
                                    'basic.html.j2',
                                    self.p.scheme,
                                    self._bokeh_cb_build_root_model,
@@ -50,7 +51,7 @@ class PlotListener(bt.ListenerBase):
         self._patch_pkgs = defaultdict(lambda: [])
 
     def _create_bokeh(self):
-        return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)
+        return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)  # get a copy of the scheme so we can modify it per client
 
     def _on_session_destroyed(self, session_context):
         with self._lock:
@@ -98,7 +99,7 @@ class PlotListener(bt.ListenerBase):
 
         with self._lock:
             client = self._clients[document.session_context.id]
-            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
 
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:

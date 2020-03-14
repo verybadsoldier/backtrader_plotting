@@ -81,7 +81,7 @@ class Bokeh(metaclass=bt.MetaParams):
         self._initialized: bool = False
         self._is_optreturn: bool = False  # when optreturn is active during optimization then we get a thinned out result only
         self._current_fig_idx: Optional[int] = None
-        self._figurepages: List[FigurePage] = []
+        self.figurepages: List[FigurePage] = []
 
     def _configure_plotting(self, strategy: bt.Strategy):
         datas, inds, obs = strategy.datas, strategy.getindicators(), strategy.getobservers()
@@ -189,7 +189,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
     @property
     def _cur_figurepage(self) -> FigurePage:
-        return self._figurepages[self._current_fig_idx]
+        return self.figurepages[self._current_fig_idx]
 
     @staticmethod
     def _resolve_plotmaster(obj):
@@ -287,23 +287,23 @@ class Bokeh(metaclass=bt.MetaParams):
         objs.sort(key=lambda x: x.plotorder)
 
     def get_figurepage(self, idx: int = 0):
-        return self._figurepages[idx]
+        return self.figurepages[idx]
 
     # region Generator Methods
     def generate_model(self, figurepage_idx: int = 0) -> Model:
         """Returns a model generated from internal blueprints"""
-        if figurepage_idx >= len(self._figurepages):
-            raise RuntimeError(f'Cannot generate model for FigurePage with index {figurepage_idx} as there are only {len(self._figurepages)}.')
+        if figurepage_idx >= len(self.figurepages):
+            raise RuntimeError(f'Cannot generate model for FigurePage with index {figurepage_idx} as there are only {len(self.figurepages)}.')
 
-        figurepage = self._figurepages[figurepage_idx]
+        figurepage = self.figurepages[figurepage_idx]
         if not self._is_optreturn:
-            tabs = self._generate_model_tabs(figurepage)
+            tabs = self.generate_model_tabs(figurepage)
         else:
             tabs = []
 
         # now append analyzer tab(s)
         analyzers = figurepage.analyzers
-        panel_analyzer = self._get_analyzer_panel(analyzers)
+        panel_analyzer = self.get_analyzer_panel(analyzers)
         if panel_analyzer is not None:
             tabs.append(panel_analyzer)
 
@@ -334,7 +334,7 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
-    def _generate_model_tabs(self, fp: FigurePage, tradingdomain=None) -> List[Panel]:
+    def generate_model_tabs(self, fp: FigurePage, tradingdomain=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
         inds = [x for x in fp.figure_envs if isinstance(x.master, bt.Indicator)]
@@ -388,7 +388,7 @@ class Bokeh(metaclass=bt.MetaParams):
         return panels
     # endregion
 
-    def _get_analyzer_panel(self, analyzers: List[bt.Analyzer]) -> Optional[Panel]:
+    def get_analyzer_panel(self, analyzers: List[bt.Analyzer]) -> Optional[Panel]:
         if len(analyzers) == 0:
             return None
 
@@ -490,8 +490,8 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # prepare new FigurePage
         fp = FigurePage(obj)
-        self._figurepages.append(fp)
-        self._current_fig_idx = len(self._figurepages) - 1
+        self.figurepages.append(fp)
+        self._current_fig_idx = len(self.figurepages) - 1
         self._is_optreturn = isinstance(obj, bt.OptReturn)
 
         if isinstance(obj, bt.Strategy):
@@ -523,7 +523,7 @@ class Bokeh(metaclass=bt.MetaParams):
     def show(self):
         """Display a figure (called by backtrader)."""
          # as the plot() function only created the figures and the columndatasources with no data -> now we fill it
-        for idx in range(len(self._figurepages)):
+        for idx in range(len(self.figurepages)):
             model = self.generate_model(idx)
 
             if self.p.output_mode in ['show', 'save']:
@@ -543,6 +543,6 @@ class Bokeh(metaclass=bt.MetaParams):
         self._reset()
 
     def _reset(self):
-        self._figurepages = []
+        self.figurepages = []
         self._is_optreturn = False
     #  endregion

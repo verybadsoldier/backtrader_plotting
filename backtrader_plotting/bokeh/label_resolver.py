@@ -46,7 +46,7 @@ def strategy2label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoCla
 
 def plotobj2label(obj):
     if isinstance(obj, bt.Indicator):
-        return f'{indicator2label(obj)}@{_indicator2fullid(obj)}'
+        return f'{indicator2label(obj)}@{indicator2fullid(obj)}'
     elif isinstance(obj, bt.Observer):
         return f'{observer2label(obj)}'
     elif isinstance(obj, bt.AbstractDataBase):
@@ -67,7 +67,7 @@ def strategy2shortname(strategy: bt.Strategy) -> str:
     return strategy.plotinfo.plotname or strategy.__class__.__name__
 
 
-def _indicator2fullid(ind: bt.Indicator) -> str:
+def indicator2fullid(ind: bt.Indicator) -> str:
     """Returns a string listing allZ involved data feeds. Empty string if there is only a single feed in the mix"""
     names = []
     for x in ind.datas:

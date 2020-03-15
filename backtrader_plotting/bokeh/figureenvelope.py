@@ -287,7 +287,7 @@ class FigureEnvelope(object):
 
         h = HoverTool(tooltips=[('Time', f'@datetime{{{self._scheme.hovertool_timeformat}}}')],
                       mode="vline",
-                      formatters={'datetime': 'datetime'}
+                      formatters={'@datetime': 'datetime'}
                       )
         f.tools.append(h)
 

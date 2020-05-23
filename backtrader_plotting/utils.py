@@ -98,7 +98,7 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
 
 
 def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase]):
-    """Find the corresponding clock for an object."""
+    """Find the corresponding clock for an object. A clock is a datetime line that holds timestamps for the line in question."""
     if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase)):
         return get_clock_line(obj._clock)
     elif isinstance(obj, (bt.StrategyBase, bt.AbstractDataBase)):
@@ -106,6 +106,9 @@ def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase
     elif isinstance(obj, bt.LineSeriesStub):
         # indicators can be created to run on a single line (instead of e.g. a data object)
         # in that case we grab the owner of that line to find the corresponding clok
+        return get_clock_line(obj._owner)
+    elif isinstance(obj, bt.LineActions):
+        # used for line actions like "macd > data[0]"
         return get_clock_line(obj._owner)
     else:
         raise Exception(f'Unsupported object type passed: {obj.__class__}')

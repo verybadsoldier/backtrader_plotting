@@ -67,8 +67,11 @@ def strategy2shortname(strategy: bt.Strategy) -> str:
     return strategy.plotinfo.plotname or strategy.__class__.__name__
 
 
-def indicator2fullid(ind: bt.Indicator) -> str:
-    """Returns a string listing allZ involved data feeds. Empty string if there is only a single feed in the mix"""
+def indicator2fullid(ind: Union[bt.Indicator, bt.LineActions]) -> str:
+    """Returns a string listing all involved data feeds. Empty string if there is only a single feed in the mix"""
+    if isinstance(ind, bt.LineActions):
+        return "Line Action"
+
     names = []
     for x in ind.datas:
         if isinstance(x, bt.AbstractDataBase):

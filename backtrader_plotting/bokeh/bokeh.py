@@ -166,7 +166,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
         for obj in itertools.chain(inds, obs):
             if not hasattr(obj, 'plotinfo'):
-                # no plotting support - so far LineSingle derived classes
+                # no plotting support cause no plotinfo attribute available - so far LineSingle derived classes
                 continue
 
             # should this indicator be plotted?
@@ -470,7 +470,8 @@ class Bokeh(metaclass=bt.MetaParams):
             strategydf = strategydf.join(df_colors)
 
         for obj in itertools.chain(strategy.getindicators(), strategy.getobservers()):
-            for lineidx in range(obj.size()):
+            num_lines = obj.size() if getattr(obj, 'size', None) else 1
+            for lineidx in range(num_lines):
                 line = obj.lines[lineidx]
                 source_id = FigureEnvelope._source_id(line)
                 dataline = line.plotrange(start, end)

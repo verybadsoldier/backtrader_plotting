@@ -127,6 +127,7 @@ class FigureEnvelope(object):
                  'x': 'x',
                  'D': 'diamond_cross',
                  'd': 'diamond',
+                 '$': 'text',
                  }
 
     def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
@@ -275,7 +276,7 @@ class FigureEnvelope(object):
                     let i = 0;
                     return dates.map(t => valid(t) ? labels[i++] : '');
                 };
-                
+
                 // we do this manually only for the first time we are called
                 const labels = axis.formatter.doFormat(ticks);
                 return labels[index];
@@ -502,13 +503,19 @@ class FigureEnvelope(object):
             kwglyphs['legend_label'] = label
 
             if marker is not None:
-                kwglyphs['size'] = lineplotinfo.markersize * 1.2
-                kwglyphs['color'] = color
+                if marker[0] == "$":
+                    kwglyphs['text_font_size'] = "{}px".format(lineplotinfo.markersize)
+                    kwglyphs['text_color'] = color
+                    kwglyphs['text'] = {"value": marker[1:-1]}
+                else:
+                    kwglyphs['size'] = lineplotinfo.markersize * 1.2
+                    kwglyphs['color'] = color
                 kwglyphs['y'] = source_id
 
-                if marker not in FigureEnvelope._mrk_fncs:
+                if marker[0] not in FigureEnvelope._mrk_fncs:
                     raise Exception(f"Sorry, unsupported marker: '{marker}'. Please report to GitHub.")
-                glyph_fnc_name = FigureEnvelope._mrk_fncs[marker]
+                    return
+                glyph_fnc_name = FigureEnvelope._mrk_fncs[marker[0]]
                 glyph_fnc = getattr(self.figure, glyph_fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0

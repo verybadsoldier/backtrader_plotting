@@ -211,19 +211,15 @@ class FigureEnvelope(object):
               {}),
         # 0 (TICKLEFT)	m25	tickleft
         0: ('triangle',
-            ["color", "size"],
             {"angle": {"value": "%sdeg" % -90}, "size": 3}),
         # 1 (TICKRIGHT)	m26	tickright
         1: ('triangle',
-            ["color", "size"],
             {"angle": {"value": "%sdeg" % 90}, "size": 3}),
         # 2 (TICKUP)	m27	tickup
         2: ('triangle',
-            ["color", "size"],
             {"size": 2}),
         # 3 (TICKDOWN)	m28	tickdown
         3: ('triangle',
-            ["color", "size"],
             {"angle": {"value": "%sdeg" % 180}, "size": 2}),
         # 4 (CARETLEFT)	m29	caretleft
         4: ('triangle',

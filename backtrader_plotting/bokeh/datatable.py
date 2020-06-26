@@ -28,24 +28,18 @@ class TableGenerator(object):
         table = [['Performance', ColummDataType.STRING], ['Value', ColummDataType.STRING]]
 
         def add_to_table(item: object, baselabel: str = ""):
-            if isinstance(item, list):
-                for ak in item:
-                    if isinstance(ak, dict):
-                        pass
-                        #add_to_table(ak, baselabel)
-            else:
-                for ak, av in item.items():
-                    label = f"{baselabel} - {ak}" if len(baselabel) > 0 else ak
-                    if isinstance(av, (bt.AutoOrderedDict, OrderedDict)):
-                        add_to_table(av, label)
-                    else:
-                        table[0].append(label)
-                        table[1].append(av)
+            for ak, av in item.items():
+                label = f"{baselabel} - {ak}" if len(baselabel) > 0 else ak
+                if isinstance(av, (bt.AutoOrderedDict, OrderedDict)):
+                    add_to_table(av, label)
+                else:
+                    table[0].append(label)
+                    table[1].append(av)
 
         add_to_table(analyzer.get_analysis())
         return type(analyzer).__name__, [table]
 
-    def _get_formatter(self, ctype: ColummDataType):
+    def _get_formatter(self,ctype: ColummDataType):
         if ctype == ColummDataType.FLOAT:
             return NumberFormatter(format=self._scheme.number_format)
         elif ctype == ColummDataType.INT:

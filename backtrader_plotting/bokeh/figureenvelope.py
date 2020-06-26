@@ -14,7 +14,7 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
-from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter, CustomJS
+from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
@@ -211,15 +211,19 @@ class FigureEnvelope(object):
               {}),
         # 0 (TICKLEFT)	m25	tickleft
         0: ('triangle',
+            ["color"],
             {"angle": {"value": "%sdeg" % -90}, "size": 3}),
         # 1 (TICKRIGHT)	m26	tickright
         1: ('triangle',
+            ["color"],
             {"angle": {"value": "%sdeg" % 90}, "size": 3}),
         # 2 (TICKUP)	m27	tickup
         2: ('triangle',
+            ["color"],
             {"size": 2}),
         # 3 (TICKDOWN)	m28	tickdown
         3: ('triangle',
+            ["color"],
             {"angle": {"value": "%sdeg" % 180}, "size": 2}),
         # 4 (CARETLEFT)	m29	caretleft
         4: ('triangle',
@@ -421,27 +425,8 @@ class FigureEnvelope(object):
 
         h = HoverTool(tooltips=[('Time', f'@datetime{{{self._scheme.hovertool_timeformat}}}')],
                       mode="vline",
-                      formatters={'@datetime': 'datetime'},)
-        callback = CustomJS(args=dict(source=self._cds, hover=h), code="""
-            var tmpl = Bokeh.require("core/util/templating");
-            if (hover.defaults == undefined || hover.defaults == false) {
-                hover.defaults = hover.tooltips
-            }
-            if (cb_data.index.indices.length > 0) {
-                var ttips = []
-                for (var i=0; i < hover.defaults.length; i++) {
-                    var val = tmpl.replace_placeholders(
-                        hover.defaults[i][1],
-                        source,
-                        cb_data.index.indices[0]);
-                    if (val != "NaN") {
-                        ttips.push(hover.defaults[i]);
-                    }
-                }
-                hover.tooltips = ttips;
-            }
-        """)
-        h.callback = callback
+                      formatters={'@datetime': 'datetime'}
+                      )
         f.tools.append(h)
 
         self._hover = h
@@ -597,9 +582,7 @@ class FigureEnvelope(object):
         else:
             self.figure.yaxis.formatter = ax_formatter
 
-        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume',
-                                 0, source=self._cds, fill_color=f'{source_id}colors_volume',
-                                 line_color=f'{source_id}colors_volume', **kwargs)
+        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
 
         # make sure the new axis only auto-scales to the volume data
         if extra_axis:

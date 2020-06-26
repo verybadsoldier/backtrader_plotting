@@ -33,3 +33,4 @@ class Blackly(Scheme):
         self.tooltip_text_value_color = "#aaaaaa"
 
         self.tag_pre_background_color = '#222222'
+        self.tag_pre_text_color = 'lightgrey'

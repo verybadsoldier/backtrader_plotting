@@ -601,7 +601,9 @@ class FigureEnvelope(object):
         else:
             self.figure.yaxis.formatter = ax_formatter
 
-        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
+        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume',
+                                 0, source=self._cds, fill_color=f'{source_id}colors_volume',
+                                 line_color=f'{source_id}colors_volume', **kwargs)
 
         # make sure the new axis only auto-scales to the volume data
         if extra_axis:

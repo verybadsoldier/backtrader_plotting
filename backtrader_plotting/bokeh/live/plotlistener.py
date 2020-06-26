@@ -49,6 +49,7 @@ class PlotListener(bt.ListenerBase):
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
         self._patch_pkgs = defaultdict(lambda: [])
+        self._lastlen = 0
 
     def _create_bokeh(self):
         return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)  # get a copy of the scheme so we can modify it per client
@@ -123,7 +124,7 @@ class PlotListener(bt.ListenerBase):
         strategy = self._cerebro.runningstrats[self.p.strategyidx]
 
         # treat as update of old data if strategy datetime is duplicated and we have already data stored
-        is_update = len(strategy) > 1 and strategy.datetime[0] == strategy.datetime[-1] and self._datastore.shape[0] > 0
+        is_update = len(strategy.data) > 1 and len(strategy) == self._lastlen and self._datastore.shape[0] > 0
 
         if is_update:
             with self._lock:
@@ -146,7 +147,7 @@ class PlotListener(bt.ListenerBase):
                         d = fulldata[column_name][index]
                         dt = fulldata['datetime'][index]
 
-                        assert odt == dt
+                        #assert odt == dt
 
                         # if value is different then put to patch package
                         # either it WAS NaN and it's not anymore

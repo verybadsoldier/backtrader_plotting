@@ -425,8 +425,27 @@ class FigureEnvelope(object):
 
         h = HoverTool(tooltips=[('Time', f'@datetime{{{self._scheme.hovertool_timeformat}}}')],
                       mode="vline",
-                      formatters={'@datetime': 'datetime'}
-                      )
+                      formatters={'@datetime': 'datetime'},)
+        callback = CustomJS(args=dict(source=self._cds, hover=h), code="""
+            var tmpl = Bokeh.require("core/util/templating");
+            if (hover.defaults == undefined || hover.defaults == false) {
+                hover.defaults = hover.tooltips
+            }
+            if (cb_data.index.indices.length > 0) {
+                var ttips = []
+                for (var i=0; i < hover.defaults.length; i++) {
+                    var val = tmpl.replace_placeholders(
+                        hover.defaults[i][1],
+                        source,
+                        cb_data.index.indices[0]);
+                    if (val != "NaN") {
+                        ttips.push(hover.defaults[i]);
+                    }
+                }
+                hover.tooltips = ttips;
+            }
+        """)
+        h.callback = callback
         f.tools.append(h)
 
         self._hover = h

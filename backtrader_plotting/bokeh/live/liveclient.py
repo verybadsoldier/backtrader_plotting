@@ -12,6 +12,7 @@ from bokeh.document import Document
 
 from backtrader_plotting.html import metadata
 from backtrader_plotting.bokeh.bokeh import FigurePage
+import numpy as np
 
 _logger = logging.getLogger(__name__)
 
@@ -119,11 +120,14 @@ class LiveClient:
         dt_idx_map = {d: idx for idx, d in enumerate(cds.data['datetime'])}
 
         patch_dict = defaultdict(list)
-        for pp in patch_pkgs:
-            colname, dt, val = pp
+        for colname, dt, val in patch_pkgs:
             if colname not in cds.data:
                 continue
-            idx = dt_idx_map[dt.to_datetime64()]
+            if dt is None:
+                idx = int(cds.data['index'][-1])
+            else:
+                idx = dt_idx_map[dt.to_datetime64()]
+
             patch_dict[colname].append((idx, val))
         _logger.info(f"Sending patch dict: {patch_dict}")
 

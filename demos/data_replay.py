@@ -25,8 +25,7 @@ class LiveDemoStrategy(bt.Strategy):
     )
 
     def __init__(self):
-        pass
-        #self._sma = bt.indicators.SMA(self.data0.close, subplot=True)
+        self._sma = bt.indicators.SMA(self.data0.close, subplot=True, period=3)
         #self._sma2 = bt.indicators.SMA(self.data1.close, subplot=True)
 
     def next(self):
@@ -86,7 +85,7 @@ def _run_resampler(data_timeframe,
                                  name=f'data{i}',
                                  )
 
-        cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
+        cerebro.replaydata(data, timeframe=resample_timeframe, compression=resample_compression)
 
     # return the recorded bars attribute from the first strategy
     res = cerebro.run()
@@ -94,14 +93,14 @@ def _run_resampler(data_timeframe,
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
     cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
                                     data_compression=1,
                                     resample_timeframe=bt.TimeFrame.Seconds,
                                     resample_compression=60,
                                     runtime_seconds=60000,
                                     tick_interval=datetime.timedelta(seconds=1),
-                                    start_delays=[None, None],
+                                    start_delays=[10, None],
                                     num_gen_bars=[0, 10],
                                     num_data=2,
                                     )

@@ -306,7 +306,7 @@ class FigureEnvelope(object):
         self.datas.append(obj)
 
     @staticmethod
-    def build_color_lines(df: pd.DataFrame, scheme, col_open: str = 'open', col_close: str = 'close', col_prefix: str='') -> pd.DataFrame:
+    def build_color_lines(df: pd.DataFrame, scheme, col_open: str = 'open', col_close: str = 'close', col_prefix: str = '') -> pd.DataFrame:
         # build color strings from scheme
         colorup = convert_color(scheme.barup)
         colordown = convert_color(scheme.bardown)

@@ -524,7 +524,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def show(self):
         """Display a figure (called by backtrader)."""
-         # as the plot() function only created the figures and the columndatasources with no data -> now we fill it
+        # as the plot() function only created the figures and the columndatasources with no data -> now we fill it
         for idx in range(len(self.figurepages)):
             model = self.generate_model(idx)
 

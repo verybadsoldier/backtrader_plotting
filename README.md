@@ -1,33 +1,39 @@
 # backtrader_plotting
 Library to add extended plotting capabilities to `backtrader` (https://www.backtrader.com/). Currently the only available backend is `Bokeh` (https://bokeh.org/).
 
+**This fork has some changes compared to backtrader_plotting:**
+
+* No need for custom backtrader
+* Different naming / structure
+* No OptBrowser
+* no info logging, using debug instead
+* Live plotting is done using an analyzer
+* Some functionality removed
+
 ## Features
 * Interactive plots
-* Interactive `backtrader` optimization result browser (only supported for single-strategy runs)
-* Highly configurable 
+* Highly configurable
 * Different skinnable themes
 * Easy to use
 
-Feel free to test it and play with it. I am happy about feedback, critics and ideas on backtrader forum (and also in GitHub issues):
-https://community.backtrader.com/topic/813/bokeh-integration-interactive-webbrowser-plotting
-
 Needs Python >= 3.6.
+
 ## Demos
 https://verybadsoldier.github.io/backtrader_plotting/
 
 ## Installation
-`pip install backtrader_plotting`
+`pip install git+https://github.com/happydasch/btplotting`
 
 ## Quickstart
 
 ```python
-from backtrader_plotting import Bokeh
-from backtrader_plotting.schemes import Tradimo
+from btplotting import BacktraderPlotting
+from btplotting.schemes import Tradimo
 
 <your backtrader code>
 
-b = Bokeh(style='bar', plot_mode='single', scheme=Tradimo())
-cerebro.plot(b)
+p = BacktraderPlotting(style='bar', plot_mode='single', scheme=Tradimo())
+cerebro.plot(p)
 ```
 
 ## Minimal Example
@@ -36,7 +42,7 @@ import datetime
 
 import backtrader as bt
 
-from backtrader_plotting import Bokeh
+from btplotting import BacktraderPlotting
 
 
 class TestStrategy(bt.Strategy):
@@ -70,28 +76,52 @@ if __name__ == '__main__':
 
     cerebro.run()
 
-    b = Bokeh(style='bar', plot_mode='single')
-    cerebro.plot(b)
+    p = BacktraderPlotting(style='bar', plot_mode='single')
+    cerebro.plot(p)
 ```
 
-## Plotting Optimization Results
-Another way to use this package is to use the `OptBrowser` to browse a `backtrader` optimization result:
+## Live Plotting Example
 
 ```python
-...
-cerebro.optstrategy(TestStrategy, buydate=range(1, 10, 1))
-cerebro.addanalyzer(bt.analyzers.SharpeRatio)
-...
-res = cerebro.run()
-bo = Bokeh()
-browser = OptBrowser(bo, result)
-browser.start()
+import datetime
+
+import backtrader as bt
+
+from btplotting import LivePlot
+
+
+class TestStrategy(bt.Strategy):
+    params = (
+        ('buydate', 21),
+        ('holdtime', 6),
+    )
+
+    def next(self):
+        if len(self.data) == self.p.buydate:
+            self.buy(self.datas[0], size=None)
+
+        if len(self.data) == self.p.buydate + self.p.holdtime:
+            self.sell(self.datas[0], size=None)
+
+
+if __name__ == '__main__':
+    cerebro = bt.Cerebro()
+
+    cerebro.addstrategy(TestStrategy, buydate=3)
+
+    data = bt.feeds.YahooFinanceCSVData(
+        dataname="datas/orcl-1995-2014.txt",
+        # Do not pass values before this date
+        fromdate=datetime.datetime(2000, 1, 1),
+        # Do not pass values after this date
+        todate=datetime.datetime(2001, 2, 28),
+        reverse=False,
+        )
+    cerebro.adddata(data)
+    cerebro.addanalyzer(
+        LivePlot,
+        scheme=Tradimo(volume=False),
+        lookback=250)
+    cerebro.run()
+
 ```
-
-This will start a Bokeh application (standalone webserver) displaying all optimization results. Different results can be selected and viewed.
-
-It is possible possible to add further user-provided columns.
-When dealing with huge amounts of optimization results the number of results can be limited and the remaining results can be sorted by a user-provided function to allow for simple selection of the best results.
-
-## Documentation
-Please refert to the Wiki for further documentation: https://github.com/verybadsoldier/backtrader_plotting/wiki

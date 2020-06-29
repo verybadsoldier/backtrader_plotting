@@ -108,26 +108,107 @@ class HoverContainer(metaclass=bt.MetaParams):
 class FigureEnvelope(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    _mrk_fncs = {'^': 'triangle',
-                 'v': 'inverted_triangle',
-                 'o': 'circle',
-                 '<': 'circle_cross',
-                 '>': 'circle_x',
-                 '1': 'diamond',
-                 '2': 'diamond_cross',
-                 '3': 'hex',
-                 '4': 'square',
-                 '8': 'square_cross',
-                 's': 'square_x',
-                 'p': 'triangle',
-                 '*': 'asterisk',
-                 'h': 'hex',
-                 'H': 'hex',
-                 '+': 'asterisk',
-                 'x': 'x',
-                 'D': 'diamond_cross',
-                 'd': 'diamond',
-                 }
+    _mrk_fncs = {
+        # "."	m00	point
+        '.': ('dot', ["color"], {"size": 1}, {}),
+        # ","	m01	pixel
+        ',': ('dot', ["color"], {"size": 2}, {}),
+        # "o"	m02	circle
+        'o': ('circle', ["color", "size"], {}, {}),
+        # "v"	m03	triangle_down
+        'v': ('triangle', ["color", "size"],
+              {"angle": 180, "angle_units": "deg"}, {}),
+        # "^"	m04	triangle_up
+        '^': ('triangle', ["color", "size"], {}, {}),
+        # "<"	m05	triangle_left
+        '<': ('triangle', ["color", "size"],
+              {"angle": -90, "angle_units": "deg"}, {}),
+        # ">"	m06	triangle_right
+        '>': ('triangle', ["color", "size"],
+              {"angle": 90, "angle_units": "deg"}, {}),
+        # "1"	m07	tri_down
+        '1': ('y', ["color", "size"], {}, {}),
+        # "2"	m08	tri_up
+        '2': ('y', ["color", "size"],
+              {"angle": 180, "angle_units": "deg"}, {}),
+        # "3"	m09	tri_left
+        '3': ('y', ["color", "size"],
+              {"angle": -90, "angle_units": "deg"}, {}),
+        # "4"	m10	tri_right
+        '4': ('y', ["color", "size"],
+              {"angle": 90, "angle_units": "deg"}, {}),
+        # "8"	m11	octagon
+        '8': ('octagon', ["color", "size"], {}, {}),
+        # "s"	m12	square
+        's': ('square', ["color", "size"], {}, {}),
+        # "p"	m13	pentagon
+        'p': ('pentagon', ["color", "size"], {}, {}),
+        # "P"	m23	plus(filled)
+        'P': ('plus', ["color", "size"], {}, {"size": -2}),
+        # "*"	m14	star
+        '*': ('asterisk', ["color", "size"], {}, {}),
+        # "h"	m15	hexagon1
+        'h': ('hex', ["color", "size"], {}, {}),
+        # "H"	m16	hexagon2
+        'H': ('hex', ["color", "size"],
+              {"angle": 45, "angle_units": "deg"}, {}),
+        # "+"	m17	plus
+        '+': ('plus', ["color", "size"], {}, {}),
+        # "x"	m18	x
+        'x': ('x', ["color", "size"], {}, {}),
+        # "X"	m24	x(filled)
+        'X': ('x', ["color", "size"], {}, {"size": -2}),
+        # "D"	m19	diamond
+        'D': ('diamond_cross', ["color", "size"], {}, {}),
+        # "d"	m20	thin_diamond
+        'd': ('diamond', ["color", "size"], {}, {}),
+        # "|"	m21	vline
+        '|': ('vbar', ["color"], {}, {}),
+        # "_"	m22	hline
+        '_': ('hbar', ["color"], {}, {}),
+        # 0 (TICKLEFT)	m25	tickleft
+        0: ('triangle', ["color", "size"],
+            {"angle": -90, "angle_units": "deg"}, {"size": -2}),
+        # 1 (TICKRIGHT)	m26	tickright
+        1: ('triangle', ["color", "size"],
+            {"angle": 90, "angle_units": "deg"}, {"size": -2}),
+        # 2 (TICKUP)	m27	tickup
+        2: ('triangle', ["color", "size"], {}, {"size": -2}),
+        # 3 (TICKDOWN)	m28	tickdown
+        3: ('triangle', ["color", "size"],
+            {"angle": 180, "angle_units": "deg"}, {"size": -2}),
+        # 4 (CARETLEFT)	m29	caretleft
+        4: ('triangle', ["fill_color", "color", "size"],
+            {"angle": -90, "angle_units": "deg"}, {}),
+        # 5 (CARETRIGHT)	m30	caretright
+        5: ('triangle', ["fill_color", "color", "size"],
+            {"angle": 90, "angle_units": "deg"}, {}),
+        # 6 (CARETUP)	m31	caretup
+        6: ('triangle', ["fill_color", "color", "size"], {}, {}),
+        # 7 (CARETDOWN)	m32	caretdown
+        7: ('triangle', ["fill_color", "color", "size"],
+            {"angle": 180, "angle_units": "deg"}, {}),
+        # 8 (CARETLEFTBASE)	m33	caretleft(centered at base)
+        8: ('triangle', ["fill_color", "color", "size"],
+            {"angle": -90, "angle_units": "deg"}, {"x": 0.25}),
+        # 9 (CARETRIGHTBASE)	m34	caretright(centered at base)
+        9: ('triangle', ["fill_color", "color", "size"],
+            {"angle": 90, "angle_units": "deg"}, {"x": -0.25}),
+        # 10 (CARETUPBASE)	m35	caretup(centered at base)
+        10: ('triangle', ["fill_color", "color", "size"],
+             {}, {"y": -0.25}),
+        # 11 (CARETDOWNBASE)	m36	caretdown(centered at base)
+        11: ('triangle', ["fill_color", "color", "size"],
+             {"angle": 180, "angle_units": "deg"}, {"y": 0.25}),
+        # "None", " " or ""	 	nothing
+        '': ('text', ["text_color", "text_font_size", "text"],
+             {}, {}),
+        ' ': ('text', ["text_color", "text_font_size", "text"],
+              {}, {}),
+        # '$...$' text
+        '$': ('text', ["text_color", "text_font_size", "text"],
+              {}, {}),
+    }
 
     def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
         self._strategy = strategy
@@ -275,7 +356,7 @@ class FigureEnvelope(object):
                     let i = 0;
                     return dates.map(t => valid(t) ? labels[i++] : '');
                 };
-                
+
                 // we do this manually only for the first time we are called
                 const labels = axis.formatter.doFormat(ticks);
                 return labels[index];
@@ -502,14 +583,49 @@ class FigureEnvelope(object):
             kwglyphs['legend_label'] = label
 
             if marker is not None:
-                kwglyphs['size'] = lineplotinfo.markersize * 1.2
-                kwglyphs['color'] = color
+                fnc_name, attrs, vals, updates = None, list(), dict(), dict()
+                if isinstance(marker, (int, float)):
+                    fnc_name, attrs, vals, updates = FigureEnvelope._mrk_fncs[int(
+                        marker)]
+                if isinstance(marker, str):
+                    fnc_name, attrs, vals, updates = FigureEnvelope._mrk_fncs[
+                        str(marker)[0]]
+                if not fnc_name or not hasattr(self.figure, fnc_name):
+                    # provide alternative methods for not available methods
+                    if fnc_name == "y":
+                        fnc_name = "text"
+                        attrs = ["text_color", "text_size"]
+                        vals.update({"text": {"value": "y"}})
+                    else:
+                        raise Exception(
+                            "Sorry, unsupported marker:"
+                            + f" '{marker}'. Please report to GitHub.")
+                        return
+                # set kwglyph values
                 kwglyphs['y'] = source_id
-
-                if marker not in FigureEnvelope._mrk_fncs:
-                    raise Exception(f"Sorry, unsupported marker: '{marker}'. Please report to GitHub.")
-                glyph_fnc_name = FigureEnvelope._mrk_fncs[marker]
-                glyph_fnc = getattr(self.figure, glyph_fnc_name)
+                for v in attrs:
+                    val = None
+                    if v in ['color', 'fill_color', 'text_color']:
+                        val = {"value": color}
+                    elif v in ['size']:
+                        val = lineplotinfo.markersize
+                    elif v in ['text_font_size']:
+                        val = {"value": "%spx" % lineplotinfo.markersize}
+                    elif v in ['text']:
+                        val = {"value": marker[1:-1]}
+                    if val is not None:
+                        kwglyphs[v] = val
+                for v in vals:
+                    val = vals[v]
+                    kwglyphs[v] = val
+                for u in updates:
+                    val = updates[u]
+                    if u in kwglyphs:
+                        kwglyphs[u] = max(
+                            1, kwglyphs[u] + val)
+                    else:
+                        kwglyphs[u] = abs(val)
+                glyph_fnc = getattr(self.figure, fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
@@ -526,6 +642,9 @@ class FigureEnvelope(object):
                 linestyle = getattr(lineplotinfo, "ls", None)
                 if linestyle is not None:
                     kwglyphs['line_dash'] = convert_linestyle(linestyle)
+                linewidth = getattr(lineplotinfo, "lw", None)
+                if linewidth is not None:
+                    kwglyphs['line_width'] = linewidth
 
                 glyph_fnc = self.figure.line
             else:

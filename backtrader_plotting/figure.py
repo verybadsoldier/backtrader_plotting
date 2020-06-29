@@ -1,24 +1,21 @@
-from array import array
 import collections
 import itertools
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
 import backtrader as bt
 
-import pandas as pd
-
-from bokeh.models import Span
+from bokeh.models import Span, Model
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, CrosshairTool
 from bokeh.models import LinearAxis, DataRange1d, Renderer
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter, CustomJS
 
-from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_indicator_data
+from .utils import get_indicator_data
+from .helper.label_resolver import datatarget2label, plotobj2label
+from .helper.bokeh import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
 
 
 class HoverContainer(metaclass=bt.MetaParams):
@@ -46,9 +43,9 @@ class HoverContainer(metaclass=bt.MetaParams):
         if t == 'd':
             return bt.AbstractDataBase
         elif t == 'i':
-            return bt.Indicator
+            return bt.IndicatorBase
         elif t == 'o':
-            return bt.Observer
+            return bt.ObserverBase
         else:
             raise RuntimeError(f'Invalid hovertool config type: "{t}')
 
@@ -59,7 +56,7 @@ class HoverContainer(metaclass=bt.MetaParams):
         for label, tmpl, src_obj in self._hover_tooltips:
             apply: bool = src_obj is fig.master  # apply to own
             foreign = False
-            if not apply and (isinstance(src_obj, bt.Observer) or isinstance(src_obj, bt.Indicator)) and src_obj.plotinfo.subplot is False:
+            if not apply and (isinstance(src_obj, bt.ObserverBase) or isinstance(src_obj, bt.IndicatorBase)) and src_obj.plotinfo.subplot is False:
                 # add objects that are on the same figure cause subplot is False (for Indicators and Observers)
                 # if plotmaster is set then it will decide where to add, otherwise clock is used
                 if src_obj.plotinfo.plotmaster is not None:
@@ -78,10 +75,10 @@ class HoverContainer(metaclass=bt.MetaParams):
                 top = True
                 # prefix with data name if we got multiple datas
                 if self.p.is_multidata and foreign:
-                    if isinstance(src_obj, bt.Indicator):
-                        prefix = label_resolver.datatarget2label(src_obj.datas) + " - "
+                    if isinstance(src_obj, bt.IndicatorBase):
+                        prefix = datatarget2label(src_obj.datas) + " - "
                     elif isinstance(src_obj, bt.AbstractDataBase):
-                        prefix = label_resolver.datatarget2label([src_obj]) + " - "
+                        prefix = datatarget2label([src_obj]) + " - "
                     top = False
 
                 item = (prefix + label, tmpl)
@@ -103,6 +100,25 @@ class HoverContainer(metaclass=bt.MetaParams):
 
                 self._apply_to_figure(f, t)
                 break
+
+
+class FigurePage(object):
+    def __init__(self, obj: Union[bt.Strategy, bt.OptReturn]):
+        self.figure_envs: List[FigureEnvelope] = []
+        self.strategy: Optional[bt.Strategy] = obj if isinstance(
+            obj, bt.Strategy) else None
+        self.cds: Optional[ColumnDataSource] = ColumnDataSource(data=dict(
+            datetime=np.array([], dtype=np.datetime64), index=np.array([], np.float64)))
+        self.analyzers: List[bt.Analyzer, bt.MetaStrategy,
+                             Optional[bt.AutoInfoClass]] = []
+        # the whole generated model will we attached here after plotting
+        self.model: Optional[Model] = None
+
+    def get_tradingdomains(self) -> List[str]:
+        tradingdomain = set()
+        for fe in self.figure_envs:
+            tradingdomain = tradingdomain.union(fe.get_tradingdomains())
+        return list(tradingdomain)
 
 
 class FigureEnvelope(object):
@@ -454,9 +470,9 @@ class FigureEnvelope(object):
     def plot(self, obj, master=None):
         if isinstance(obj, bt.AbstractDataBase):
             self.plot_data(obj)
-        elif isinstance(obj, bt.indicator.Indicator):
+        elif isinstance(obj, bt.IndicatorBase):
             self.plot_indicator(obj, master)
-        elif isinstance(obj, bt.observers.Observer):
+        elif isinstance(obj, bt.ObserverBase):
             self.plot_observer(obj, master)
         else:
             raise Exception(f"Unsupported plot object: {type(obj)}")
@@ -482,39 +498,6 @@ class FigureEnvelope(object):
 
         self.datas.append(obj)
 
-    @staticmethod
-    def build_color_lines(df: pd.DataFrame, scheme, col_open: str = 'open', col_close: str = 'close', col_prefix: str='') -> pd.DataFrame:
-        # build color strings from scheme
-        colorup = convert_color(scheme.barup)
-        colordown = convert_color(scheme.bardown)
-        colorup_wick = convert_color(scheme.barup_wick)
-        colordown_wick = convert_color(scheme.bardown_wick)
-        colorup_outline = convert_color(scheme.barup_outline)
-        colordown_outline = convert_color(scheme.bardown_outline)
-        volup = convert_color(scheme.volup)
-        voldown = convert_color(scheme.voldown)
-
-        # build binary series determining if up or down bar
-        is_up: pd.DataFrame = df[col_close] >= df[col_open]
-
-        # we use the open-line as a indicator for NaN values
-        nan_ref = df[col_open]
-
-        # TODO: we want to have NaN values in the color lines if the corresponding data is also NaN
-        # find better way with less isnan usage
-
-        color_df = pd.DataFrame(index=df.index)
-        color_df[col_prefix + 'colors_bars'] = [np.nan if np.isnan(n) else colorup if x else colordown for x, n in zip(is_up, nan_ref)]
-        color_df[col_prefix + 'colors_wicks'] = [np.nan if np.isnan(n) else colorup_wick if x else colordown_wick for x, n in zip(is_up, nan_ref)]
-        color_df[col_prefix + 'colors_outline'] = [np.nan if np.isnan(n) else colorup_outline if x else colordown_outline for x, n in zip(is_up, nan_ref)]
-        color_df[col_prefix + 'colors_volume'] = [np.nan if np.isnan(n) else volup if x else voldown for x, n in zip(is_up, nan_ref)]
-
-        # convert to object since we want to hold str and NaN
-        for c in color_df.columns:
-            color_df[c] = color_df[c].astype(object)
-
-        return color_df
-
     def _add_column(self, name, dtype):
         self._add_columns([(name, dtype)])
 
@@ -524,7 +507,7 @@ class FigureEnvelope(object):
 
     def plot_data(self, data: bt.AbstractDataBase):
         source_id = FigureEnvelope._source_id(data)
-        title = sanitize_source_name(label_resolver.datatarget2label([data]))
+        title = sanitize_source_name(datatarget2label([data]))
 
         # append to title
         self._figure_append_title(title)
@@ -614,10 +597,10 @@ class FigureEnvelope(object):
     def plot_observer(self, obj, master):
         self._plot_indicator_observer(obj, master)
 
-    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
+    def plot_indicator(self, obj: Union[bt.IndicatorBase, bt.ObserverBase], master):
         self._plot_indicator_observer(obj, master)
 
-    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer], master):
+    def _plot_indicator_observer(self, obj: Union[bt.IndicatorBase, bt.ObserverBase], master):
         pl = plotobj2label(obj)
 
         self._figure_append_title(pl)

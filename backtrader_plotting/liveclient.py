@@ -5,19 +5,22 @@ import logging
 import backtrader as bt
 
 from bokeh.models.widgets import Panel, Tabs, Slider, Button
-from bokeh.layouts import column, gridplot, row
+from bokeh.layouts import column, row
 from bokeh.io import curdoc
-from bokeh.models.widgets import CheckboxGroup, Div, Select
+from bokeh.models.widgets import Div, Select
 from bokeh.document import Document
 
-from backtrader_plotting.html import metadata
-from backtrader_plotting.bokeh.bokeh import FigurePage
+from .figure import FigurePage
+from .helper.metadata import get_metadata_div
 
 _logger = logging.getLogger(__name__)
 
 
 class LiveClient:
-    def __init__(self, doc: Document, push_fnc, bokeh_fac: callable, push_data_fnc:callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
+    def __init__(self, doc: Document, push_fnc,
+                 app_fac: callable, push_data_fnc: callable,
+                 strategy: bt.Strategy, figurepage_idx: int = 0,
+                 lookback: int = 20):
         self._slider_aspectratio = None
         self._push_data_fnc = push_data_fnc
         self._push_fnc = push_fnc
@@ -28,10 +31,10 @@ class LiveClient:
         self._current_group = None
         self.document = doc
 
-        self._bokeh_fac = bokeh_fac
-        self._bokeh = None
+        self._app_fac = app_fac
+        self._app = None
 
-        bokeh = self._bokeh_fac()  # temporary bokeh object to get tradingdomains and scheme
+        bokeh = self._app_fac()  # temporary bokeh object to get tradingdomains and scheme
         self._scheme = copy(bokeh.p.scheme)  # preserve original scheme as originally provided by the user
 
         tradingdomains = bokeh.list_tradingdomains(strategy)
@@ -47,24 +50,24 @@ class LiveClient:
         self.model = column(children=[controls, Tabs(tabs=[])], sizing_mode=self._scheme.plot_sizing_mode)
 
         # append meta tab
-        meta = Div(text=metadata.get_metadata_div(strategy))
+        meta = Div(text=get_metadata_div(strategy))
         self._panel_metadata = Panel(child=meta, title="Meta")
 
         self._refreshmodel()
 
     def _refreshmodel(self):
-        self._bokeh = self._bokeh_fac()
-        self._bokeh.p.scheme = self._scheme  # replace the original scheme with a possibly user customized scheme
+        self._app = self._app_fac()
+        self._app.p.scheme = self._scheme  # replace the original scheme with a possibly user customized scheme
 
-        self._bokeh.plot(self._strategy, tradingdomain=self._current_group, fill_data=False)
+        self._app.plot(self._strategy, tradingdomain=self._current_group, fill_data=False)
 
-        self._figurepage: FigurePage = self._bokeh.figurepages[self._figurepage_idx]
+        self._figurepage: FigurePage = self._app.figurepages[self._figurepage_idx]
 
-        panels = self._bokeh.generate_model_tabs(self._figurepage)
+        panels = self._app.generate_model_tabs(self._figurepage)
 
         # now append analyzer tab(s)
         analyzers = self._figurepage.analyzers
-        panel_analyzer = self._bokeh.get_analyzer_panel(analyzers)
+        panel_analyzer = self._app.get_analyzer_panel(analyzers)
         if panel_analyzer is not None:
             panels.append(panel_analyzer)
 
@@ -77,17 +80,17 @@ class LiveClient:
         self.last_data_index = -1
 
     def _on_click_refresh_analyzers(self):
-        panel = self._bokeh.get_analyzer_panel(self._figurepage.analyzers)
+        panel = self._app.get_analyzer_panel(self._figurepage.analyzers)
         self.model.children[1].tabs[1] = panel
 
     def on_button_save_config(self):
         self._scheme.plotaspectratio = self._slider_aspectratio.value
-        for f in self._bokeh.figurepages[0].figure_envs:
+        for f in self._app.figurepages[0].figure_envs:
             f.figure.aspect_ratio = self._slider_aspectratio.value
 
     def _get_config_panel(self):
         def on_change_checkbox(vals):
-            for i, f in enumerate(self._bokeh.figurepages[0].figure_envs):
+            for i, f in enumerate(self._app.figurepages[0].figure_envs):
                 if i > 1:
                     continue
                 f.figure.visible = i in vals
@@ -102,7 +105,7 @@ class LiveClient:
         return Panel(child=column(children=[r1, button]), title='Config')
 
     def _on_select_group(self, a, old, new):
-        _logger.info(f"Switching logic group to {new}...")
+        _logger.debug(f"Switching logic group to {new}...")
         self._current_group = new
         doc = curdoc()
         doc.hold()
@@ -111,7 +114,7 @@ class LiveClient:
 
         self._push_data_fnc(doc)
 
-        _logger.info(f"Switching logic group finished")
+        _logger.debug(f"Switching logic group finished")
 
     def push_patches(self, patch_pkgs):
         cds = self._figurepage.cds
@@ -123,11 +126,16 @@ class LiveClient:
             colname, dt, val = pp
             if colname not in cds.data:
                 continue
+            elif colname == "datetime":
+                idx = dt_idx_map[dt.to_datetime64()]
+                # store new datetime in index map
+                dt_idx_map[val.to_datetime64()] = idx
             idx = dt_idx_map[dt.to_datetime64()]
             patch_dict[colname].append((idx, val))
-        _logger.info(f"Sending patch dict: {patch_dict}")
+        _logger.debug(f"Sending patch dict: {patch_dict}")
 
         cds.patch(patch_dict)
+        print(cds)
 
     def push_adds(self, updatepkg: dict, new_last_index: int):
         self.last_data_index = new_last_index
@@ -139,5 +147,5 @@ class LiveClient:
             if c in cds.data:
                 sendpkg[c] = updatepkg[c]
 
-        _logger.info(f'Sending stream package: {sendpkg}')
+        _logger.debug(f'Sending stream package: {sendpkg}')
         cds.stream(sendpkg, self._lookback)

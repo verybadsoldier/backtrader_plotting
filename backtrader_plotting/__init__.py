@@ -1,7 +1,5 @@
-from backtrader_plotting.bokeh.bokeh import Bokeh
-
-from backtrader_plotting.bokeh.optbrowser import OptBrowser
+from .app import BacktraderPlotting
 
 # initialize analyzer tables
-from backtrader_plotting.analyzer_tables import inject_datatables
-inject_datatables()
+#from .analyzer_tables import inject_datatables
+#inject_datatables()

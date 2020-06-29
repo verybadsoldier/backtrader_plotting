@@ -2,10 +2,10 @@ from typing import List, Optional, Union
 
 import backtrader as bt
 
-from backtrader_plotting.utils import get_params_str
+from ..utils import get_params_str
 
 
-def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
+def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.IndicatorBase]]):
     """Convert datas (usually a datafeed but might also be an indicator if one indicator operates on another indicator) to a readable string.
     If a name was provided manually then use that."""
 
@@ -16,7 +16,7 @@ def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
     prim_names = ['_name', 'shortname', '_dataname']
     labels = []
     for d in datas:
-        if isinstance(d, bt.Indicator):
+        if isinstance(d, bt.IndicatorBase):
             labels.append(indicator2label(d))
         elif isinstance(d, bt.AbstractDataBase):
             for n in prim_names:
@@ -40,14 +40,14 @@ def strategy2label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoCla
     label = strategycls.__name__
     parameter_labels = get_params_str(params)
     if len(parameter_labels) > 0:
-        label += f' [{parameter_labels}'
+        label += f' [{parameter_labels}]'
     return label
 
 
 def plotobj2label(obj):
-    if isinstance(obj, bt.Indicator):
+    if isinstance(obj, bt.IndicatorBase):
         return f'{indicator2label(obj)}@{indicator2fullid(obj)}'
-    elif isinstance(obj, bt.Observer):
+    elif isinstance(obj, bt.ObserverBase):
         return f'{observer2label(obj)}'
     elif isinstance(obj, bt.AbstractDataBase):
         return obj.__class__.__name__
@@ -55,11 +55,11 @@ def plotobj2label(obj):
         raise RuntimeError(f'Unsupported type: {obj.__class__.__name__}')
 
 
-def indicator2label(ind: bt.Indicator):
+def indicator2label(ind: bt.IndicatorBase):
     return ind.plotlabel()
 
 
-def observer2label(obs: bt.Observer):
+def observer2label(obs: bt.ObserverBase):
     return obs.plotlabel()
 
 
@@ -67,7 +67,7 @@ def strategy2shortname(strategy: bt.Strategy) -> str:
     return strategy.plotinfo.plotname or strategy.__class__.__name__
 
 
-def indicator2fullid(ind: Union[bt.Indicator, bt.LineActions]) -> str:
+def indicator2fullid(ind: Union[bt.IndicatorBase, bt.LineActions]) -> str:
     """Returns a string listing all involved data feeds. Empty string if there is only a single feed in the mix"""
     if isinstance(ind, bt.LineActions):
         return "Line Action"
@@ -80,6 +80,6 @@ def indicator2fullid(ind: Union[bt.Indicator, bt.LineActions]) -> str:
             # indicator target is one specific line of a datafeed
             # AFAIK it's not possible to know which line it is so we only add a generic indicator "[L]"
             return datatarget2label([x._owner]) + '[L]'
-        elif isinstance(x, bt.Indicator):
+        elif isinstance(x, bt.IndicatorBase):
             names.append(indicator2label(x))
     return f"({','.join(names)})"

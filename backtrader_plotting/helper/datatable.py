@@ -18,9 +18,8 @@ class ColummDataType(Enum):
 
 
 class TableGenerator(object):
-    def __init__(self, scheme, cerebro: bt.Cerebro=None):
+    def __init__(self, scheme):
         self._scheme = scheme
-        self._cerebtro: bt.Cerebro = cerebro
 
     @staticmethod
     def _get_analysis_table_generic(analyzer: bt.analyzers.Analyzer) -> Tuple[object, List[object]]:
@@ -28,18 +27,24 @@ class TableGenerator(object):
         table = [['Performance', ColummDataType.STRING], ['Value', ColummDataType.STRING]]
 
         def add_to_table(item: object, baselabel: str = ""):
-            for ak, av in item.items():
-                label = f"{baselabel} - {ak}" if len(baselabel) > 0 else ak
-                if isinstance(av, (bt.AutoOrderedDict, OrderedDict)):
-                    add_to_table(av, label)
-                else:
-                    table[0].append(label)
-                    table[1].append(av)
+            if isinstance(item, list):
+                for ak in item:
+                    if isinstance(ak, dict):
+                        pass
+                        #add_to_table(ak, baselabel)
+            else:
+                for ak, av in item.items():
+                    label = f"{baselabel} - {ak}" if len(baselabel) > 0 else ak
+                    if isinstance(av, (bt.AutoOrderedDict, OrderedDict)):
+                        add_to_table(av, label)
+                    else:
+                        table[0].append(label)
+                        table[1].append(av)
 
         add_to_table(analyzer.get_analysis())
         return type(analyzer).__name__, [table]
 
-    def _get_formatter(self,ctype: ColummDataType):
+    def _get_formatter(self, ctype: ColummDataType):
         if ctype == ColummDataType.FLOAT:
             return NumberFormatter(format=self._scheme.number_format)
         elif ctype == ColummDataType.INT:
@@ -63,6 +68,7 @@ class TableGenerator(object):
 
         param_str = get_params_str(analyzer.params)
         if len(param_str) > 0:
+            
             title += f' ({param_str})'
 
         elems: List[DataTable] = []

@@ -5,8 +5,8 @@ import markdown2
 
 import backtrader as bt
 
-from backtrader_plotting.utils import get_params, paramval2str
-from backtrader_plotting.bokeh.label_resolver import indicator2fullid
+from ..utils import get_params, paramval2str
+from .label_resolver import indicator2fullid
 
 
 def _get_parameter_table(params) -> str:

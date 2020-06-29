@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-import math
 from typing import Dict, Optional, List, Union
 
 import backtrader as bt
@@ -19,7 +18,7 @@ def paramval2str(name, value):
         return bt.TimeFrame.getname(value, 1)
     elif isinstance(value, float):
         return f"{value:.2f}"
-    elif isinstance(value, (list,tuple)):
+    elif isinstance(value, (list, tuple)):
         return ','.join(value)
     elif isinstance(value, type):
         return value.__name__
@@ -40,11 +39,6 @@ def get_params_str(params: Optional[bt.AutoInfoClass]) -> str:
     plabs = [f"{x}: {paramval2str(x, y)}" for x, y in user_params.items()]
     plabs = '/'.join(plabs)
     return plabs
-
-
-def nanfilt(x: List) -> List:
-    """filters all NaN values from a list"""
-    return [value for value in x if not math.isnan(value)]
 
 
 def convert_by_line_clock(line, line_clk, new_clk):
@@ -74,7 +68,14 @@ def convert_by_line_clock(line, line_clk, new_clk):
     return new_line
 
 
-def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
+def convert_to_pandas(
+        strat_clk,
+        obj: bt.LineSeries,
+        start: int = None,
+        end: int = None,
+        name_prefix: str = "",
+        num_back=None) -> pd.DataFrame:
+
     lines_clk = obj.lines.datetime.plotrange(start, end)
 
     df = pd.DataFrame()
@@ -97,21 +98,30 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
     return df
 
 
-def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase]):
-    """Find the corresponding clock for an object. A clock is a datetime line that holds timestamps for the line in question."""
+def get_clock_obj(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.Strategy]):
     if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase)):
-        return get_clock_line(obj._clock)
-    elif isinstance(obj, (bt.StrategyBase, bt.AbstractDataBase)):
+        return get_clock_obj(obj._clock)
+    elif isinstance(obj, (bt.Strategy, bt.AbstractDataBase)):
         clk = obj
     elif isinstance(obj, bt.LineSeriesStub):
-        # indicators can be created to run on a single line (instead of e.g. a data object)
-        # in that case we grab the owner of that line to find the corresponding clok
-        return get_clock_line(obj._owner)
+        # indicators can be created to run on a single line
+        # (instead of e.g. a data object) in that case we grab
+        # the owner of that line to find the corresponding clock
+        return get_clock_obj(obj._owner)
     elif isinstance(obj, bt.LineActions):
         # used for line actions like "macd > data[0]"
-        return get_clock_line(obj._owner)
+        return get_clock_obj(obj._owner)
     else:
         raise Exception(f'Unsupported object type passed: {obj.__class__}')
+    return clk
+
+
+def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.Strategy]):
+    """
+    Find the corresponding clock for an object.
+    A clock is a datetime line that holds timestamps for the line in question.
+    """
+    clk = get_clock_obj(obj)
     return clk.lines.datetime
 
 
@@ -129,3 +139,13 @@ def find_by_plotid(strategy: bt.Strategy, plotid):
         return founds[0]
     else:
         raise RuntimeError(f'Found multiple objects with plotid "{plotid}"')
+
+
+def get_indicator_data(indicator: bt.IndicatorBase):
+    """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
+    a LineSeriesStub has been created for which we have to resolve the original data"""
+    data = indicator.data
+    if isinstance(data, bt.LineSeriesStub):
+        return data._owner
+    else:
+        return data

@@ -1,11 +1,19 @@
 from jinja2 import Environment, PackageLoader
 
 import matplotlib.colors
-
-import backtrader as bt
-from backtrader_plotting.utils import nanfilt
+import numpy as np
+import pandas as pd
 
 from bokeh.models import ColumnDataSource
+
+
+_style_mpl2bokeh = {
+    '-': 'solid',
+    '--': 'dashed',
+    ':': 'dotted',
+    '.-': 'dotdash',
+    '-.': 'dashdot',
+}
 
 
 def convert_color(color):
@@ -16,6 +24,39 @@ def convert_color(color):
         return hex_string
     except ValueError:
         return matplotlib.colors.to_hex(color)
+
+
+def build_color_lines(df: pd.DataFrame, scheme, col_open: str = 'open', col_close: str = 'close', col_prefix: str='') -> pd.DataFrame:
+    # build color strings from scheme
+    colorup = convert_color(scheme.barup)
+    colordown = convert_color(scheme.bardown)
+    colorup_wick = convert_color(scheme.barup_wick)
+    colordown_wick = convert_color(scheme.bardown_wick)
+    colorup_outline = convert_color(scheme.barup_outline)
+    colordown_outline = convert_color(scheme.bardown_outline)
+    volup = convert_color(scheme.volup)
+    voldown = convert_color(scheme.voldown)
+
+    # build binary series determining if up or down bar
+    is_up: pd.DataFrame = df[col_close] >= df[col_open]
+
+    # we use the open-line as a indicator for NaN values
+    nan_ref = df[col_open]
+
+    # TODO: we want to have NaN values in the color lines if the corresponding data is also NaN
+    # find better way with less isnan usage
+
+    color_df = pd.DataFrame(index=df.index)
+    color_df[col_prefix + 'colors_bars'] = [np.nan if np.isnan(n) else colorup if x else colordown for x, n in zip(is_up, nan_ref)]
+    color_df[col_prefix + 'colors_wicks'] = [np.nan if np.isnan(n) else colorup_wick if x else colordown_wick for x, n in zip(is_up, nan_ref)]
+    color_df[col_prefix + 'colors_outline'] = [np.nan if np.isnan(n) else colorup_outline if x else colordown_outline for x, n in zip(is_up, nan_ref)]
+    color_df[col_prefix + 'colors_volume'] = [np.nan if np.isnan(n) else volup if x else voldown for x, n in zip(is_up, nan_ref)]
+
+    # convert to object since we want to hold str and NaN
+    for c in color_df.columns:
+        color_df[c] = color_df[c].astype(object)
+
+    return color_df
 
 
 def sanitize_source_name(name: str) -> str:
@@ -30,22 +71,13 @@ def get_bar_width() -> float:
     return 0.5
 
 
-_style_mpl2bokeh = {
-    '-': 'solid',
-    '--': 'dashed',
-    ':': 'dotted',
-    '.-': 'dotdash',
-    '-.': 'dashdot',
-}
-
-
 def convert_linestyle(style: str) -> str:
     """Converts a backtrader/matplotlib style string to bokeh style string"""
     return _style_mpl2bokeh[style]
 
 
 def adapt_yranges(y_range, data, padding_factor=200.0):
-    nnan_data = nanfilt(data)
+    nnan_data = [x for x in data if not x != x]
     dmin = min(nnan_data, default=None)
     dmax = max(nnan_data, default=None)
 
@@ -66,7 +98,7 @@ def adapt_yranges(y_range, data, padding_factor=200.0):
 
 
 def generate_stylesheet(scheme, template="basic.css.j2") -> str:
-    env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
+    env = Environment(loader=PackageLoader('btplotting', 'templates'))
     templ = env.get_template(template)
 
     css = templ.render(dict(
@@ -96,13 +128,3 @@ def append_cds(base_cds: ColumnDataSource, new_cds: ColumnDataSource):
             continue
         updates.append((c, new_cds[c]))
     base_cds.data.update(updates)
-
-
-def get_indicator_data(indicator: bt.Indicator):
-    """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
-    a LineSeriesStub has been created for which we have to resolve the original data"""
-    data = indicator.data
-    if isinstance(data, bt.LineSeriesStub):
-        return data._owner
-    else:
-        return data

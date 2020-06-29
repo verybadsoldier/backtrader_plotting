@@ -7,10 +7,10 @@ from bokeh.server.server import Server
 
 from jinja2 import Environment, PackageLoader
 
-from backtrader_plotting.bokeh import utils
+from .helper.bokeh import generate_stylesheet
 
 
-class BokehWebapp:
+class Webapp:
     def __init__(self, title, html_template, scheme, model_factory_fnc, on_session_destroyed=None, port=80):
         self._title = title
         self._html_template = html_template
@@ -29,9 +29,9 @@ class BokehWebapp:
             doc.title = self._title
 
             # set document template
-            env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
+            env = Environment(loader=PackageLoader('btplotting', 'templates'))
             doc.template = env.get_template(self._html_template)
-            doc.template_variables['stylesheet'] = utils.generate_stylesheet(self._scheme)
+            doc.template_variables['stylesheet'] = generate_stylesheet(self._scheme)
 
             # get root model
             model = self._model_factory_fnc(doc)
@@ -57,4 +57,3 @@ class BokehWebapp:
             else:
                 server.start()
                 ioloop.start()
-

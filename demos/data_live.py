@@ -8,12 +8,10 @@ import logging
 
 import backtrader as bt
 
-from backtrader_plotting.schemes import Blackly
-
-try:
-    from backtrader_plotting.bokeh.live.plotlistener import PlotListener
-except AttributeError:
-    raise Exception('Plotting in live mode only supported when using modified backtrader package from this branch https://github.com/verybadsoldier/backtrader/tree/development')
+from btplotting import LivePlot
+from btplotting.schemes import Blackly
+from btplotting.analyzers import Recorder
+from btplotting.feeds import FakeFeed
 
 _logger = logging.getLogger(__name__)
 
@@ -60,9 +58,9 @@ def _run_resampler(data_timeframe,
     cerebro = bt.Cerebro()
     cerebro.addstrategy(LiveDemoStrategy)
 
-    cerebro.addlistener(bt.listeners.RecorderListener)
+    cerebro.addanalyzer(Recorder)
 
-    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'), lookback=120)
+    cerebro.addanalyzer(LivePlot, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'), lookback=120)
 
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
@@ -75,16 +73,16 @@ def _run_resampler(data_timeframe,
         if num_gen_bars is not None and i <= len(num_gen_bars) and num_gen_bars[i] is not None:
             num_gen_bar = num_gen_bars[i]
 
-        data = bt.feeds.FakeFeed(timeframe=data_timeframe,
-                                 compression=data_compression,
-                                 run_duration=datetime.timedelta(seconds=runtime_seconds),
-                                 starting_value=starting_value,
-                                 tick_interval=tick_interval,
-                                 live=True,
-                                 num_gen_bars=num_gen_bar,
-                                 start_delay=start_delay,
-                                 name=f'data{i}',
-                                 )
+        data = FakeFeed(timeframe=data_timeframe,
+                        compression=data_compression,
+                        run_duration=datetime.timedelta(seconds=runtime_seconds),
+                        starting_value=starting_value,
+                        tick_interval=tick_interval,
+                        live=True,
+                        num_gen_bars=num_gen_bar,
+                        start_delay=start_delay,
+                        name=f'data{i}',
+                        )
 
         cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
 

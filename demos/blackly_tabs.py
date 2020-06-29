@@ -2,7 +2,7 @@ import datetime
 
 import backtrader as bt
 
-from backtrader_plotting import Bokeh
+from btplotting import BacktraderPlotting
 
 
 class MyStrategy(bt.Strategy):
@@ -37,5 +37,5 @@ if __name__ == '__main__':
 
     cerebro.run()
 
-    b = Bokeh(style='bar', tabs='multi')
-    cerebro.plot(b)
+    p = BacktraderPlotting(style='bar', tabs='multi')
+    cerebro.plot(p)

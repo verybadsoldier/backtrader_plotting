@@ -18,10 +18,9 @@ _logger = logging.getLogger(__name__)
 
 
 class LiveClient:
-    def __init__(self, doc: Document, push_fnc, bokeh_fac: callable, push_data_fnc:callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
+    def __init__(self, doc: Document, bokeh_fac: callable, push_data_fnc: callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
         self._slider_aspectratio = None
         self._push_data_fnc = push_data_fnc
-        self._push_fnc = push_fnc
         self._figurepage_idx = figurepage_idx
         self.last_data_index = -1
         self._lookback = lookback

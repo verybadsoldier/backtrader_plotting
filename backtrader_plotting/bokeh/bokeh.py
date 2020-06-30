@@ -28,9 +28,9 @@ from bokeh.util.browser import view
 from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds, get_indicator_data
-from backtrader_plotting.utils import convert_by_line_clock, get_clock_line
+from backtrader_plotting.utils import convert_by_line_clock, get_clock_line, find_by_plotid, convert_to_pandas
 from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.utils import find_by_plotid, convert_to_pandas
+from backtrader_plotting.bokeh.utils import get_tradingdomain
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
@@ -55,6 +55,7 @@ class FigurePage(object):
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
     def get_tradingdomains(self) -> List[str]:
+        """Return a lust of all aggregated tradingdomains of all FigureEnvs."""
         tradingdomain = set()
         for fe in self.figure_envs:
             tradingdomain = tradingdomain.union(fe.get_tradingdomains())
@@ -136,11 +137,12 @@ class Bokeh(metaclass=bt.MetaParams):
                 raise RuntimeError(f'Unknown config type in plotting config: {k}')
 
     def list_tradingdomains(self, strategy: bt.Strategy):
+        """Return a list of all trading domains to be found in a strategy."""
         data_graph, volume_graph = self._build_graph(strategy.datas, strategy.getindicators(), strategy.getobservers())
 
         lgs = list()
         for master in itertools.chain(data_graph.keys(), volume_graph):
-            lg = FigureEnvelope._resolve_tradingdomain(master)
+            lg = get_tradingdomain(master)
             if isinstance(lg, str) and lg not in lgs:
                 lgs.append(lg)
 

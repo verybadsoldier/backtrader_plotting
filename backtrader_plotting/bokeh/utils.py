@@ -1,4 +1,5 @@
 from jinja2 import Environment, PackageLoader
+from typing import Union
 
 import matplotlib.colors
 
@@ -106,3 +107,26 @@ def get_indicator_data(indicator: bt.Indicator):
         return data._owner
     else:
         return data
+
+
+def get_tradingdomain(obj) -> Union[str, bool]:
+    """Returns the trading domain in effect for an object. This either the value of the plotinfo attribute or it will be resolved up chain."""
+    td = obj.plotinfo.tradingdomain
+    if td is not None:
+        return td
+
+    if isinstance(obj, bt.AbstractDataBase):
+        # data feeds are end points
+        return obj._name
+    elif isinstance(obj, bt.IndicatorBase):
+        # lets find the data the indicator is based on
+        data = get_indicator_data(obj)
+        return get_tradingdomain(data)
+    elif isinstance(obj, bt.ObserverBase):
+        # distinguish between observers related to data and strategy wide observers
+        if isinstance(obj._clock, bt.AbstractDataBase):
+            return get_tradingdomain(obj._clock)
+        else:
+            return True  # for strategy wide observers we return True which means it belongs to all logic groups
+    else:
+        raise Exception('unsupported')

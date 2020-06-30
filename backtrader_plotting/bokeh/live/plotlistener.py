@@ -66,7 +66,6 @@ class PlotListener(bt.ListenerBase):
 
     def _bokeh_cb_build_root_model(self, doc: Document):
         client = LiveClient(doc,
-                            self._bokeh_cb_push_adds,
                             self._create_bokeh,
                             self._bokeh_cb_push_adds,
                             self._cerebro.runningstrats[self.p.strategyidx],
@@ -162,7 +161,6 @@ class PlotListener(bt.ListenerBase):
                 fulldata = self._bokeh.build_strategy_data(strategy)
 
                 if update_type == self.UpdateType.FILL:
-                    return
                     # generate series with number of missing values per column
                     new_count = fulldata.isnull().sum()
                     cur_count = self._datastore.isnull().sum()

@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_indicator_data
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_tradingdomain
 from backtrader_plotting.bokeh.marker import get_marker_info
 
 
@@ -107,6 +107,7 @@ class HoverContainer(metaclass=bt.MetaParams):
 
 
 class FigureEnvelope(object):
+    """Class that wraps a *single* figure."""
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
     def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
@@ -130,36 +131,22 @@ class FigureEnvelope(object):
 
     @staticmethod
     def should_filter_by_tradingdomain(obj, tradingdomain):
+        """Check if an object should be filtered regarding the passing trading domain. Used to filter when plotting."""
         if tradingdomain is None:
             return True
 
         if isinstance(tradingdomain, str):
             tradingdomain = [tradingdomain]
 
-        obj_lg = FigureEnvelope._resolve_tradingdomain(obj)
+        obj_lg = get_tradingdomain(obj)
         return obj_lg is True or obj_lg in tradingdomain
 
-    @staticmethod
-    def _resolve_tradingdomain(obj) -> Union[bool, str]:
-        if isinstance(obj, bt.AbstractDataBase):
-            # data feeds are end points
-            return obj._name
-        elif isinstance(obj, bt.IndicatorBase):
-            # lets find the data the indicator is based on
-            data = get_indicator_data(obj)
-            return FigureEnvelope._resolve_tradingdomain(data)
-        elif isinstance(obj, bt.ObserverBase):
-            if isinstance(obj._clock, bt.AbstractDataBase):
-                return FigureEnvelope._resolve_tradingdomain(obj._clock)
-            else:
-                return True  # for wide observers we return True which means it belongs to all logic groups
-        else:
-            raise Exception('unsupported')
-
     def get_tradingdomains(self) -> List[str]:
+        """Return the list of trading domain strings belonging to this FigureEnvelope. If no was manually configured then
+        the root data name is used."""
         tradingdomains = []
         if self._tradingdomain is None:
-            tradingdomains.append(self._resolve_tradingdomain(self.master))
+            tradingdomains.append(get_tradingdomain(self.master))
         elif isinstance(self._tradingdomain, list):
             tradingdomains += self._tradingdomain
         elif isinstance(self._tradingdomain, str):

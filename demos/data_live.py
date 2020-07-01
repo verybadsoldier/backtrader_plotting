@@ -62,7 +62,7 @@ def _run_resampler(data_timeframe,
 
     cerebro.addlistener(bt.listeners.RecorderListener)
 
-    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S'), lookback=120)
+    cerebro.addlistener(PlotListener, volume=False, scheme=Blackly(hovertool_timeformat='%F %R:%S', tabs='multi'), lookback=120)
 
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
@@ -84,6 +84,7 @@ def _run_resampler(data_timeframe,
                                  num_gen_bars=num_gen_bar,
                                  start_delay=start_delay,
                                  name=f'data{i}',
+                                 tradingdomain='sdf',
                                  )
 
         cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
@@ -94,14 +95,14 @@ def _run_resampler(data_timeframe,
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
     cerebro, strat = _run_resampler(data_timeframe=bt.TimeFrame.Ticks,
                                     data_compression=1,
                                     resample_timeframe=bt.TimeFrame.Seconds,
-                                    resample_compression=60,
+                                    resample_compression=5,
                                     runtime_seconds=60000,
                                     tick_interval=datetime.timedelta(seconds=1),
-                                    start_delays=[None, None],
+                                    start_delays=[None, 13],
                                     num_gen_bars=[0, 10],
                                     num_data=2,
                                     )

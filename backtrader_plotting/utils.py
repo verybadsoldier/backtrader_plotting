@@ -47,16 +47,16 @@ def nanfilt(x: List) -> List:
     return [value for value in x if not math.isnan(value)]
 
 
-def convert_by_line_clock(line, line_clk, new_clk):
+def convert_to_master_clock(line, line_clk, master_clock):
     """Takes a clock and generates an appropriate line with a value for each entry in clock. Values are taken from another line if the
     clock value in question is found in its line_clk. Otherwise NaN is used"""
-    if new_clk is None:
+    if master_clock is None:
         return line
 
     clk_offset = len(line_clk) - len(line)  # sometimes the clock has more data than the data line
     new_line = []
     next_start_idx = 0
-    for sc in new_clk:
+    for sc in master_clock:
         for i in range(next_start_idx, len(line_clk)):
             v = line_clk[i]
             if sc == v:
@@ -74,7 +74,7 @@ def convert_by_line_clock(line, line_clk, new_clk):
     return new_line
 
 
-def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
+def convert_to_pandas(master_clock, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
     lines_clk = obj.lines.datetime.plotrange(start, end)
 
     df = pd.DataFrame()
@@ -88,11 +88,11 @@ def convert_to_pandas(strat_clk, obj: bt.LineSeries, start: datetime = None, end
         # get data limited to time range
         data = line.plotrange(start, end)
 
-        ndata = convert_by_line_clock(data, lines_clk, strat_clk)
+        ndata = convert_to_master_clock(data, lines_clk, master_clock)
 
         df[name_prefix + linealias] = ndata
 
-    df[name_prefix + 'datetime'] = [bt.num2date(x) for x in strat_clk]
+    df[name_prefix + 'datetime'] = [bt.num2date(x) for x in master_clock]
 
     return df
 

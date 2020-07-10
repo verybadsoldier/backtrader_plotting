@@ -1,18 +1,26 @@
 from collections import defaultdict
 from copy import copy
+from datetime import datetime, timedelta
 import logging
+from typing import Any, Callable, Dict
 
 import backtrader as bt
 
 from bokeh.models.widgets import Panel, Tabs, Slider, Button
-from bokeh.layouts import column, gridplot, row
+from bokeh.layouts import column, row
 from bokeh.io import curdoc
-from bokeh.models.widgets import CheckboxGroup, Div, Select
+from bokeh.models.widgets import Div, Select
 from bokeh.document import Document
+
+from bokeh.models import ColumnDataSource
 
 from backtrader_plotting.html import metadata
 from backtrader_plotting.bokeh.bokeh import FigurePage
+
+import pandas as pd
+
 import numpy as np
+
 
 _logger = logging.getLogger(__name__)
 
@@ -22,7 +30,6 @@ class LiveClient:
         self._slider_aspectratio = None
         self._push_data_fnc = push_data_fnc
         self._figurepage_idx = figurepage_idx
-        self.last_data_index = -1
         self._lookback = lookback
         self._strategy = strategy
         self._current_group = None
@@ -30,6 +37,7 @@ class LiveClient:
 
         self._bokeh_fac = bokeh_fac
         self._bokeh = None
+        self._callback_fullrefresh = None
 
         bokeh = self._bokeh_fac()  # temporary bokeh object to get tradingdomains and scheme
         self._scheme = copy(bokeh.p.scheme)  # preserve original scheme as originally provided by the user
@@ -52,6 +60,22 @@ class LiveClient:
 
         self._refreshmodel()
 
+    def add_fullrefresh_callback(self, cb: Callable, timeout: int):
+        if self._callback_fullrefresh is not None:
+            try:
+                self.document.remove_timeout_callback(self._callback_fullrefresh)
+            except ValueError:
+                # ignore error when timeout was already removed
+                pass
+        self._callback_fullrefresh = self.document.add_timeout_callback(cb, timeout)
+
+    @property
+    def last_index(self):
+        """Return -1 in case of no data yet (basically to make greater-operator work."""
+        if len(self._figurepage.cds.data['index']) == 0:
+            return -1
+        return self._figurepage.cds.data['index'][-1]
+
     def _refreshmodel(self):
         self._bokeh = self._bokeh_fac()
         self._bokeh.p.scheme = self._scheme  # replace the original scheme with a possibly user customized scheme
@@ -73,8 +97,6 @@ class LiveClient:
         # append config panel
         panels.append(self._get_config_panel())
         self.model.children[1].tabs = panels
-
-        self.last_data_index = -1
 
     def _on_click_refresh_analyzers(self):
         panel = self._bokeh.get_analyzer_panel(self._figurepage.analyzers)
@@ -113,6 +135,12 @@ class LiveClient:
 
         _logger.info(f"Switching logic group finished")
 
+    # region Functions to actually push data to the CDS
+    def push_full_refresh(self, fulldata: pd.DataFrame):
+        cds = self._figurepage.cds
+        update_pkg = {c: fulldata[c] for c in cds.column_names}
+        self._figurepage.cds.data.update(update_pkg)
+
     def push_patches(self, patch_pkgs):
         cds = self._figurepage.cds
 
@@ -132,15 +160,24 @@ class LiveClient:
 
         cds.patch(patch_dict)
 
-    def push_adds(self, updatepkg: dict, new_last_index: int):
-        self.last_data_index = new_last_index
-
+    def push_adds(self, updatepkg: dict):
         cds = self._figurepage.cds
-
         sendpkg = {}
         for c in updatepkg.keys():
-            if c in cds.data:
-                sendpkg[c] = updatepkg[c]
+            if c not in cds.data:
+                continue
+            sendpkg[c] = updatepkg[c]
 
         _logger.info(f'Sending stream package: {sendpkg}')
         cds.stream(sendpkg, self._lookback)
+
+    def push_insert(self, package: Dict[str, Any], position: int = 0):
+        cds = self._figurepage.cds
+
+        update_pkg = {}
+        for c in package.keys():
+            if c not in cds.data:
+                continue
+            update_pkg[c] = np.insert(cds.data[c], position, package[c])
+        self._figurepage.cds.data.update(update_pkg)
+    # endregion

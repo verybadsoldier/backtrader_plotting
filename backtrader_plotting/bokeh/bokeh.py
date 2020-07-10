@@ -28,7 +28,7 @@ from bokeh.util.browser import view
 from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds, get_indicator_data
-from backtrader_plotting.utils import convert_by_line_clock, get_clock_line, find_by_plotid, convert_to_pandas
+from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.utils import get_tradingdomain
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
@@ -55,7 +55,7 @@ class FigurePage(object):
         self.model: Optional[Model] = None  # the whole generated model will we attached here after plotting
 
     def get_tradingdomains(self) -> List[str]:
-        """Return a lust of all aggregated tradingdomains of all FigureEnvs."""
+        """Return a list of all aggregated tradingdomains of all FigureEnvs."""
         tradingdomain = set()
         for fe in self.figure_envs:
             tradingdomain = tradingdomain.union(fe.get_tradingdomains())
@@ -435,12 +435,31 @@ class Bokeh(metaclass=bt.MetaParams):
     def savefig(self, fig, filename, width, height, dpi, tight):
         self._generate_output(fig, filename)
 
+    @staticmethod
+    def _build_master_clock(strategy: bt.Strategy,
+                            start: Optional[datetime.datetime] = None, end: Optional[datetime.datetime] = None,
+                            num_back: Optional[int] = None,
+                            startidx: int = 0):
+        master_clock = []
+        for obj in itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers()):
+            line_clk = get_clock_line(obj).plotrange(start, end)
+            master_clock += line_clk
+
+        # remove duplicates
+        master_clock = list(dict.fromkeys(master_clock))
+
+        master_clock.sort()
+
+        return master_clock
+
     def build_strategy_data(self, strategy: bt.Strategy,
                             start: Optional[datetime.datetime] = None, end: Optional[datetime.datetime] = None,
                             num_back: Optional[int] = None,
                             startidx: int = 0):
         """startidx: index number to write into the dataframe for the index column"""
         strategydf = pd.DataFrame()
+
+        master_clock = self._build_master_clock(strategy, start, end, num_back, startidx)
 
         start, end = Bokeh._get_start_end(strategy, start, end)
 
@@ -450,12 +469,13 @@ class Bokeh(metaclass=bt.MetaParams):
         strat_clk = np.unique(strat_clk)
 
         if num_back is None:
-            num_back = len(strat_clk)
+            num_back = len(master_clock)
 
-        strat_clk = strat_clk[-num_back:]
+        master_clock = master_clock[-num_back:]
+        strategydf['master_clock'] = master_clock
 
         # we use timezone of first data. we might see duplicated timestamps here
-        dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in strat_clk]
+        dtline = [bt.num2date(x, strategy.datas[0]._tz) for x in master_clock]
 
         # add an index line to use as x-axis (instead of datetime axis) to avoid datetime gaps (e.g. weekends)
         indices = list(range(startidx, startidx + len(dtline)))
@@ -465,7 +485,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
         for data in strategy.datas:
             source_id = FigureEnvelope._source_id(data)
-            df_data = convert_to_pandas(strat_clk, data, start, end, source_id)
+            df_data = convert_to_pandas(master_clock, data, start, end, source_id)
 
             strategydf = strategydf.join(df_data)
 
@@ -480,7 +500,7 @@ class Bokeh(metaclass=bt.MetaParams):
                 dataline = line.plotrange(start, end)
 
                 line_clk = get_clock_line(obj).plotrange(start, end)
-                dataline = convert_by_line_clock(dataline, line_clk, strat_clk)
+                dataline = convert_to_master_clock(dataline, line_clk, master_clock)
                 strategydf[source_id] = dataline
 
         # apply a proper index (should be identical to 'index' column)

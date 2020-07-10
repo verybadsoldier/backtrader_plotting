@@ -40,6 +40,7 @@ class PlotListener(bt.ListenerBase):
         ADD = 1,
         UPDATE_LAST = 2,
         FILL = 3,
+        FULL_REFRESH = 4,
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
@@ -55,6 +56,7 @@ class PlotListener(bt.ListenerBase):
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
         self._patch_pkgs = defaultdict(lambda: [])
+        self._pkgs_insert = defaultdict(lambda: [])
         self._prev_strategy_len = 0
 
     def _create_bokeh(self):
@@ -105,7 +107,8 @@ class PlotListener(bt.ListenerBase):
 
         with self._lock:
             client: LiveClient = self._clients[document.session_context.id]
-            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
+            # updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
 
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:
@@ -113,7 +116,14 @@ class PlotListener(bt.ListenerBase):
 
             updatepkg = ColumnDataSource.from_df(updatepkg_df)
 
-            client.push_adds(updatepkg, new_last_index=updatepkg_df['index'].iloc[-1])
+            client.push_adds(updatepkg)
+
+    def _bokeh_full_refresh(self):
+        document = curdoc()
+        session_id = document.session_context.id
+        with self._lock:
+            client: LiveClient = self._clients[session_id]
+            client.push_full_refresh(self._datastore)
 
     def _bokeh_cb_push_patches(self):
         document = curdoc()
@@ -137,6 +147,62 @@ class PlotListener(bt.ListenerBase):
             _logger.info("Patch pkg: " + str(patch_pkgs))
             client.push_patches(patch_pkgs)
 
+    def _bokeh_cb_push_inserts(self, bootstrap_document=None):
+        document = curdoc()
+        session_id = document.session_context.id
+        with self._lock:
+            client: LiveClient = self._clients[session_id]
+
+            pkg_insert = self._pkgs_insert[session_id]
+            self._pkgs_insert[session_id] = []
+            _logger.info("Insert pkg: " + str(pkg_insert))
+            client.push_insert(pkg_insert)
+
+    def _update_last(self, fulldata):
+        last_row = fulldata.tail(1)
+        for column_name in last_row.columns:
+            if column_name in ['index']:
+                continue
+            d = last_row[column_name].iloc[0]
+            if isinstance(d, float) and np.isnan(d):
+                continue
+            self._datastore.at[self._datastore.index[-1], column_name] = d  # update data in datastore
+            for sess_id in self._clients.keys():
+                self._patch_pkgs[sess_id].append((column_name, None, d))
+
+                # WIP: make curernt bar outline red
+                # if column_name.endswith('outline'):
+                #    self._patch_pkgs[sess_id].append((column_name, None, '#ff0000'))
+
+    def _update_fill(self, fulldata):
+        # generate series with number of missing values per column
+        new_count = fulldata.isnull().sum()
+        cur_count = self._datastore.isnull().sum()
+
+        # boolean series that indicates which column is missing data
+        patched_cols = new_count != cur_count
+
+        # get dataframe with only those columns that added data
+        patchcols = fulldata[fulldata.columns[patched_cols]]
+        for column_name in patchcols.columns:
+            for index, row in self._datastore.iterrows():
+                # compare all values in this column
+                od = row[column_name]
+                odt = row['datetime']
+                d = fulldata[column_name][index]
+                dt = fulldata['datetime'][index]
+
+                assert odt == dt
+
+                # if value is different then put to patch package
+                # either it WAS NaN and it's not anymore
+                # or both not NaN but different now
+                # and don't count it as True when both are NaN
+                if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
+                    self._datastore.at[index, column_name] = d  # update data in datastore
+                    for sess_id in self._clients.keys():
+                        self._patch_pkgs[sess_id].append((column_name, odt, d))
+
     def next(self):
         strategy = self._cerebro.runningstrats[self.p.strategyidx]
 
@@ -150,59 +216,25 @@ class PlotListener(bt.ListenerBase):
         else:
             assert len(strategy) > self._prev_strategy_len
             if len(strategy) > 1 and strategy.datetime[0] == strategy.datetime[-1] and self._datastore.shape[0] > 0:
-                update_type = self.UpdateType.FILL
+                update_type = self.UpdateType.FULL_REFRESH
             else:
                 update_type = self.UpdateType.ADD
 
         self._prev_strategy_len = len(strategy)
 
-        if update_type in [self.UpdateType.UPDATE_LAST, self.UpdateType.FILL]:
+        if update_type in [self.UpdateType.UPDATE_LAST, self.UpdateType.FILL, self.UpdateType.FULL_REFRESH]:
             with self._lock:
                 fulldata = self._bokeh.build_strategy_data(strategy)
 
                 if update_type == self.UpdateType.FILL:
-                    # generate series with number of missing values per column
-                    new_count = fulldata.isnull().sum()
-                    cur_count = self._datastore.isnull().sum()
-
-                    # boolean series that indicates which column is missing data
-                    patched_cols = new_count != cur_count
-
-                    # get dataframe with only those columns that added data
-                    patchcols = fulldata[fulldata.columns[patched_cols]]
-                    for column_name in patchcols.columns:
-                        for index, row in self._datastore.iterrows():
-                            # compare all values in this column
-                            od = row[column_name]
-                            odt = row['datetime']
-                            d = fulldata[column_name][index]
-                            dt = fulldata['datetime'][index]
-
-                            assert odt == dt
-
-                            # if value is different then put to patch package
-                            # either it WAS NaN and it's not anymore
-                            # or both not NaN but different now
-                            # and don't count it as True when both are NaN
-                            if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                                self._datastore.at[index, column_name] = d  # update data in datastore
-                                for sess_id in self._clients.keys():
-                                    self._patch_pkgs[sess_id].append((column_name, odt, d))
+                    self._update_fill(fulldata)
                 elif update_type == self.UpdateType.UPDATE_LAST:
-                    last_row = fulldata.tail(1)
-                    for column_name in last_row.columns:
-                        if column_name in ['index']:
-                            continue
-                        d = last_row[column_name].iloc[0]
-                        if isinstance(d, float) and np.isnan(d):
-                            continue
-                        self._datastore.at[self._datastore.index[-1], column_name] = d  # update data in datastore
-                        for sess_id in self._clients.keys():
-                            self._patch_pkgs[sess_id].append((column_name, None, d))
-
-                            # WIP: make curernt bar outline red
-                            # if column_name.endswith('outline'):
-                            #    self._patch_pkgs[sess_id].append((column_name, None, '#ff0000'))
+                    self._update_last(fulldata)
+                elif update_type == self.UpdateType.FULL_REFRESH:
+                    self._datastore = fulldata
+                    for client in self._clients.values():
+                        client.add_fullrefresh_callback(self._bokeh_full_refresh, 1)
+                    return
                 else:
                     assert False
 
@@ -212,7 +244,7 @@ class PlotListener(bt.ListenerBase):
             with self._lock:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
 
-                num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
+                num_back = 1 if self._datastore.shape[0] > 0 else None  # if we have NO data yet then fetch all (first call)
                 new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
 
                 # i have seen an empty line in the past. let's catch it here

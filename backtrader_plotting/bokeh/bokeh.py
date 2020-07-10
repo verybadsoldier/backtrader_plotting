@@ -339,7 +339,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def generate_model_tabs(self, fp: FigurePage, tradingdomain=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
-        datas = [x for x in fp.figure_envs if isinstance(x.master, bt.DataBase)]
+        datas = [x for x in fp.figure_envs if isinstance(x.master, bt.AbstractDataBase)]
         inds = [x for x in fp.figure_envs if isinstance(x.master, bt.Indicator)]
 
         # now assign figures to tabs

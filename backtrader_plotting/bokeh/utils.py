@@ -130,3 +130,14 @@ def get_tradingdomain(obj) -> Union[str, bool]:
             return True  # for strategy wide observers we return True which means it belongs to all logic groups
     else:
         raise Exception('unsupported')
+
+
+def get_plotlineinfo(obj, lineidx):
+    linealias = obj.lines._getlinealias(lineidx)
+    lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
+    if not lineplotinfo:
+        lineplotinfo = getattr(obj.plotlines, linealias, None)
+
+    if not lineplotinfo:
+        lineplotinfo = bt.AutoInfoClass()
+    return lineplotinfo

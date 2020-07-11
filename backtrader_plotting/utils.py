@@ -47,7 +47,7 @@ def nanfilt(x: List) -> List:
     return [value for value in x if not math.isnan(value)]
 
 
-def convert_to_master_clock(line, line_clk, master_clock):
+def convert_to_master_clock(line, line_clk, master_clock, fill_by_prev=False):
     """Takes a clock and generates an appropriate line with a value for each entry in clock. Values are taken from another line if the
     clock value in question is found in its line_clk. Otherwise NaN is used"""
     if master_clock is None:
@@ -57,6 +57,7 @@ def convert_to_master_clock(line, line_clk, master_clock):
     new_line = []
     next_start_idx = 0
     for sc in master_clock:
+        found = False
         for i in range(next_start_idx, len(line_clk)):
             v = line_clk[i]
             if sc == v:
@@ -68,9 +69,18 @@ def convert_to_master_clock(line, line_clk, master_clock):
                 else:
                     new_line.append(line[line_idx])
                 next_start_idx = i + 1
+                found = True
                 break
-        else:
-            new_line.append(float('nan'))
+            elif v > sc:
+                # no need to keep searching...
+                break
+
+        if not found:
+            if len(new_line) > 0 and fill_by_prev:
+                fill_v = new_line[-1]  # fill missing values with prev value
+            else:
+                fill_v = float('nan')  # fill with NaN, Bokeh wont plot
+            new_line.append(fill_v)
     return new_line
 
 

@@ -18,7 +18,7 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_tradingdomain
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_plotlineinfo, get_tradingdomain
 from backtrader_plotting.bokeh.marker import get_marker_info
 
 
@@ -261,13 +261,13 @@ class FigureEnvelope(object):
         self._hover = h
         self.figure = f
 
-    def plot(self, obj, master=None):
+    def plot(self, obj):
         if isinstance(obj, bt.AbstractDataBase):
             self.plot_data(obj)
         elif isinstance(obj, bt.indicator.Indicator):
-            self.plot_indicator(obj, master)
+            self.plot_indicator(obj)
         elif isinstance(obj, bt.observers.Observer):
-            self.plot_observer(obj, master)
+            self.plot_observer(obj)
         else:
             raise Exception(f"Unsupported plot object: {type(obj)}")
 
@@ -419,13 +419,13 @@ class FigureEnvelope(object):
 
         self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 
-    def plot_observer(self, obj, master):
-        self._plot_indicator_observer(obj, master)
+    def plot_observer(self, obj):
+        self._plot_indicator_observer(obj)
 
-    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer], master):
-        self._plot_indicator_observer(obj, master)
+    def plot_indicator(self, obj: Union[bt.Indicator, bt.Observer]):
+        self._plot_indicator_observer(obj)
 
-    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer], master):
+    def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer]):
         pl = plotobj2label(obj)
 
         self._figure_append_title(pl)
@@ -438,20 +438,15 @@ class FigureEnvelope(object):
             source_id = FigureEnvelope._source_id(line)
             linealias = obj.lines._getlinealias(lineidx)
 
-            lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
-            if not lineplotinfo:
-                lineplotinfo = getattr(obj.plotlines, linealias, None)
-
-            if not lineplotinfo:
-                lineplotinfo = bt.AutoInfoClass()
+            lineplotinfo = get_plotlineinfo(obj, lineidx)
 
             if lineplotinfo._get('_plotskip', False):
                 continue
 
-            marker = lineplotinfo._get("marker", None)
-            method = lineplotinfo._get('_method', "line")
+            marker = lineplotinfo._get('marker', None)
+            method = lineplotinfo._get('_method', 'line')
 
-            color = getattr(lineplotinfo, "color", None)
+            color = getattr(lineplotinfo, 'color', None)
             if color is None:
                 if not lineplotinfo._get('_samecolor', False):
                     self._nextcolor()

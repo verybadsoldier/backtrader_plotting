@@ -183,9 +183,11 @@ class Bokeh(metaclass=bt.MetaParams):
             else:
                 plotmaster = plotmaster if plotmaster is not None else get_indicator_data(obj)
 
-                if plotmaster not in data_graph:
-                    data_graph[plotmaster] = []
-                data_graph[plotmaster].append(obj)
+                # check if the plostmaster is about to be plotted. otherwise we would activae it here implicitly
+                if plotmaster.plotinfo.plot:
+                    if plotmaster not in data_graph:
+                        data_graph[plotmaster] = []
+                    data_graph[plotmaster].append(obj)
 
         return data_graph, volume_graph
 

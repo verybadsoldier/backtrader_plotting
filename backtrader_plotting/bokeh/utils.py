@@ -81,6 +81,7 @@ def generate_stylesheet(scheme, template="basic.css.j2") -> str:
                              tooltip_text_color_value=scheme.tooltip_text_value_color,
                              body_background_color=scheme.body_background_color,
                              tag_pre_background_color=scheme.tag_pre_background_color,
+                             tag_pre_text_color=scheme.tag_pre_text_color,
                              headline_color=scheme.plot_title_text_color,
                              text_color=scheme.text_color,
                            )

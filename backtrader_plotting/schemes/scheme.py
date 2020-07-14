@@ -41,6 +41,7 @@ class Scheme(_BtPlotScheme):
         self.plot_title_text_color = 'darkgrey'
         self.axis_label_text_color = 'darkgrey'
         self.tag_pre_background_color = 'lightgrey'
+        self.tag_pre_text_color = 'black'
 
         self.xaxis_pos = "all"  # "all" or "bottom"
 

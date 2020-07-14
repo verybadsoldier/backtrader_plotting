@@ -19,6 +19,7 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_indicator_data
+from backtrader_plotting.bokeh.marker import get_marker_info
 
 
 class HoverContainer(metaclass=bt.MetaParams):
@@ -107,27 +108,6 @@ class HoverContainer(metaclass=bt.MetaParams):
 
 class FigureEnvelope(object):
     _tools = "pan,wheel_zoom,box_zoom,reset"
-
-    _mrk_fncs = {'^': 'triangle',
-                 'v': 'inverted_triangle',
-                 'o': 'circle',
-                 '<': 'circle_cross',
-                 '>': 'circle_x',
-                 '1': 'diamond',
-                 '2': 'diamond_cross',
-                 '3': 'hex',
-                 '4': 'square',
-                 '8': 'square_cross',
-                 's': 'square_x',
-                 'p': 'triangle',
-                 '*': 'asterisk',
-                 'h': 'hex',
-                 'H': 'hex',
-                 '+': 'asterisk',
-                 'x': 'x',
-                 'D': 'diamond_cross',
-                 'd': 'diamond',
-                 }
 
     def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
         self._strategy = strategy
@@ -275,7 +255,7 @@ class FigureEnvelope(object):
                     let i = 0;
                     return dates.map(t => valid(t) ? labels[i++] : '');
                 };
-                
+
                 // we do this manually only for the first time we are called
                 const labels = axis.formatter.doFormat(ticks);
                 return labels[index];
@@ -502,14 +482,44 @@ class FigureEnvelope(object):
             kwglyphs['legend_label'] = label
 
             if marker is not None:
-                kwglyphs['size'] = lineplotinfo.markersize * 1.2
-                kwglyphs['color'] = color
-                kwglyphs['y'] = source_id
+                fnc_name, attrs, vals, updates = get_marker_info(marker)
 
-                if marker not in FigureEnvelope._mrk_fncs:
-                    raise Exception(f"Sorry, unsupported marker: '{marker}'. Please report to GitHub.")
-                glyph_fnc_name = FigureEnvelope._mrk_fncs[marker]
-                glyph_fnc = getattr(self.figure, glyph_fnc_name)
+                if not fnc_name or not hasattr(self.figure, fnc_name):
+                    # provide alternative methods for not available methods
+                    if fnc_name == "y":
+                        fnc_name = "text"
+                        attrs = ["text_color", "text_size"]
+                        vals.update({"text": {"value": "y"}})
+                    else:
+                        raise Exception(
+                            "Sorry, unsupported marker:"
+                            + f" '{marker}'. Please report to GitHub.")
+                        return
+                # set kwglyph values
+                kwglyphs['y'] = source_id
+                for v in attrs:
+                    val = None
+                    if v in ['color', 'fill_color', 'text_color']:
+                        val = {"value": color}
+                    elif v in ['size']:
+                        val = lineplotinfo.markersize
+                    elif v in ['text_font_size']:
+                        val = {"value": "%spx" % lineplotinfo.markersize}
+                    elif v in ['text']:
+                        val = {"value": marker[1:-1]}
+                    if val is not None:
+                        kwglyphs[v] = val
+                for v in vals:
+                    val = vals[v]
+                    kwglyphs[v] = val
+                for u in updates:
+                    val = updates[u]
+                    if u in kwglyphs:
+                        kwglyphs[u] = max(
+                            1, kwglyphs[u] + val)
+                    else:
+                        raise Exception(f"{u} for {marker} is not set but needs to be set")
+                glyph_fnc = getattr(self.figure, fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
@@ -526,6 +536,9 @@ class FigureEnvelope(object):
                 linestyle = getattr(lineplotinfo, "ls", None)
                 if linestyle is not None:
                     kwglyphs['line_dash'] = convert_linestyle(linestyle)
+                linewidth = getattr(lineplotinfo, "lw", None)
+                if linewidth is not None:
+                    kwglyphs['line_width'] = linewidth
 
                 glyph_fnc = self.figure.line
             else:

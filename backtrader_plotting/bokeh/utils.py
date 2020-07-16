@@ -133,10 +133,12 @@ def get_tradingdomain(obj) -> Union[str, bool]:
 
 
 def get_plotlineinfo(obj, lineidx):
-    linealias = obj.lines._getlinealias(lineidx)
-    lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
-    if not lineplotinfo:
-        lineplotinfo = getattr(obj.plotlines, linealias, None)
+    lineplotinfo = None
+    if not isinstance(obj.lines, list):
+        linealias = obj.lines._getlinealias(lineidx)
+        lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
+        if not lineplotinfo and linealias is not None:
+            lineplotinfo = getattr(obj.plotlines, linealias, None)
 
     if not lineplotinfo:
         lineplotinfo = bt.AutoInfoClass()

@@ -5,6 +5,7 @@ from typing import Dict, Optional, List, Union
 
 import backtrader as bt
 
+import numpy as np
 import pandas as pd
 import itertools
 
@@ -53,31 +54,37 @@ def convert_to_master_clock(line, line_clk, master_clock, fill_by_prev=False):
     if master_clock is None:
         return line
 
-    clk_offset = len(line_clk) - len(line)  # sometimes the clock has more data than the data line
-    new_line = []
+    # sometimes the clock has more data than the data line
+    # not sure when this is the case
+    # i think both are left aligned so for latest clock values there is no data
+    clk_offset = len(line_clk) - len(line)
+    new_line = []  # hold the data for the resampled line
     next_start_idx = 0
-    for sc in master_clock:
+    prev_lvalue = np.nan  # conserve previous line value for fill_by_prev
+    # iterate each master_clock entry and try to find a matching clock in the source line
+    for mc in master_clock:
         found = False
         for i in range(next_start_idx, len(line_clk)):
-            v = line_clk[i]
-            if sc == v:
-                # exact hit
-                line_idx = i - clk_offset
-                if line_idx < 0:
-                    # data line is shorter so we don't have data
-                    new_line.append(float('nan'))
-                else:
-                    new_line.append(line[line_idx])
-                next_start_idx = i + 1
+            lc = line_clk[i]
+            line_idx = i - clk_offset
+
+            # data line might be shorter so we don't have data
+            lvalue = np.nan if line_idx < 0 else line[line_idx]
+
+            if mc == lc:
+                new_line.append(lvalue)
+                next_start_idx = i  # start searching from *this* index to have a chance to catch it as prev value next round
                 found = True
                 break
-            elif v > sc:
+            elif lc > mc:
                 # no need to keep searching...
                 break
+            else:
+                prev_lvalue = lvalue
 
         if not found:
-            if len(new_line) > 0 and fill_by_prev:
-                fill_v = new_line[-1]  # fill missing values with prev value
+            if fill_by_prev:
+                fill_v = prev_lvalue  # fill missing values with prev value
             else:
                 fill_v = float('nan')  # fill with NaN, Bokeh wont plot
             new_line.append(fill_v)

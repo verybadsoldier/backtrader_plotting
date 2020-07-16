@@ -497,11 +497,11 @@ class Bokeh(metaclass=bt.MetaParams):
                 dataline = line.plotrange(start, end)
 
                 lineplotinfo = get_plotlineinfo(obj, lineidx)
-
+                marker = lineplotinfo._get('marker', None)
                 method = lineplotinfo._get('_method', 'line')
 
                 line_clk = get_clock_line(obj).plotrange(start, end)
-                dataline = convert_to_master_clock(dataline, line_clk, master_clock, fill_by_prev=method == 'line')
+                dataline = convert_to_master_clock(dataline, line_clk, master_clock, fill_by_prev=marker is None and method == 'line')
                 strategydf[source_id] = dataline
 
         # apply a proper index (should be identical to 'index' column)

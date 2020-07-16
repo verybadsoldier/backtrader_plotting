@@ -1,7 +1,6 @@
-from array import array
 import collections
 import itertools
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -18,7 +17,8 @@ from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormat
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
-from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle, get_plotlineinfo, get_tradingdomain
+from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
+from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain
 from backtrader_plotting.bokeh.marker import get_marker_info
 
 

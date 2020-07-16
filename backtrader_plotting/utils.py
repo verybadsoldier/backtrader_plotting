@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 import logging
 import math
 from typing import Dict, Optional, List, Union
@@ -48,7 +49,7 @@ def nanfilt(x: List) -> List:
     return [value for value in x if not math.isnan(value)]
 
 
-def convert_to_master_clock(line, line_clk, master_clock, fill_by_prev=False):
+def convert_to_master_clock(line, line_clk, master_clock, forward_fill=False):
     """Takes a clock and generates an appropriate line with a value for each entry in clock. Values are taken from another line if the
     clock value in question is found in its line_clk. Otherwise NaN is used"""
     if master_clock is None:
@@ -83,7 +84,7 @@ def convert_to_master_clock(line, line_clk, master_clock, fill_by_prev=False):
                 prev_lvalue = lvalue
 
         if not found:
-            if fill_by_prev:
+            if forward_fill:
                 fill_v = prev_lvalue  # fill missing values with prev value
             else:
                 fill_v = float('nan')  # fill with NaN, Bokeh wont plot
@@ -146,3 +147,65 @@ def find_by_plotid(strategy: bt.Strategy, plotid):
         return founds[0]
     else:
         raise RuntimeError(f'Found multiple objects with plotid "{plotid}"')
+
+
+class PlotType(Enum):
+    MARKER = 1,
+    LINE = 2,
+    BAR = 3,
+
+
+def get_plottype(obj, lineidx: int) -> PlotType:
+    lineplotinfo = get_plotlineinfo(obj, lineidx)
+    marker = lineplotinfo._get('marker', None)
+    if marker is not None:
+        return PlotType.MARKER
+
+    method = lineplotinfo._get('_method', 'line')
+    return PlotType.LINE if method == 'line' else PlotType.BAR
+
+
+def get_indicator_data(indicator: bt.Indicator):
+    """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
+    a LineSeriesStub has been created for which we have to resolve the original data"""
+    data = indicator.data
+    if isinstance(data, bt.LineSeriesStub):
+        return data._owner
+    else:
+        return data
+
+
+def get_tradingdomain(obj) -> Union[str, bool]:
+    """Returns the trading domain in effect for an object. This either the value of the plotinfo attribute or it will be resolved up chain."""
+    td = obj.plotinfo.tradingdomain
+    if td is not None:
+        return td
+
+    if isinstance(obj, bt.AbstractDataBase):
+        # data feeds are end points
+        return obj._name
+    elif isinstance(obj, bt.IndicatorBase):
+        # lets find the data the indicator is based on
+        data = get_indicator_data(obj)
+        return get_tradingdomain(data)
+    elif isinstance(obj, bt.ObserverBase):
+        # distinguish between observers related to data and strategy wide observers
+        if isinstance(obj._clock, bt.AbstractDataBase):
+            return get_tradingdomain(obj._clock)
+        else:
+            return True  # for strategy wide observers we return True which means it belongs to all logic groups
+    else:
+        raise Exception('unsupported')
+
+
+def get_plotlineinfo(obj, lineidx):
+    lineplotinfo = None
+    if not isinstance(obj.lines, list):
+        linealias = obj.lines._getlinealias(lineidx)
+        lineplotinfo = getattr(obj.plotlines, '_%d' % lineidx, None)
+        if not lineplotinfo and linealias is not None:
+            lineplotinfo = getattr(obj.plotlines, linealias, None)
+
+    if not lineplotinfo:
+        lineplotinfo = bt.AutoInfoClass()
+    return lineplotinfo

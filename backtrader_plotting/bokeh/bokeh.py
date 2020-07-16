@@ -1,5 +1,3 @@
-from array import array
-from collections import defaultdict
 import bisect
 import datetime
 import itertools
@@ -27,10 +25,9 @@ from bokeh.util.browser import view
 
 from jinja2 import Environment, PackageLoader
 
-from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds, get_indicator_data
-from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas
+from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
+from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indicator_data, get_tradingdomain, get_plottype, PlotType
 from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.bokeh.utils import get_plotlineinfo, get_tradingdomain
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
@@ -496,12 +493,10 @@ class Bokeh(metaclass=bt.MetaParams):
                 source_id = FigureEnvelope._source_id(line)
                 dataline = line.plotrange(start, end)
 
-                lineplotinfo = get_plotlineinfo(obj, lineidx)
-                marker = lineplotinfo._get('marker', None)
-                method = lineplotinfo._get('_method', 'line')
+                plottype = get_plottype(obj, lineidx)
 
                 line_clk = get_clock_line(obj).plotrange(start, end)
-                dataline = convert_to_master_clock(dataline, line_clk, master_clock, fill_by_prev=marker is None and method == 'line')
+                dataline = convert_to_master_clock(dataline, line_clk, master_clock, forward_fill=plottype == PlotType.LINE)
                 strategydf[source_id] = dataline
 
         # apply a proper index (should be identical to 'index' column)

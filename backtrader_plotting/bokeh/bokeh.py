@@ -465,11 +465,6 @@ class Bokeh(metaclass=bt.MetaParams):
 
         start, end = Bokeh._get_start_end(strategy, start, end)
 
-        strat_clk: array[float] = strategy.lines.datetime.plotrange(start, end)
-
-        # if patches occured then we see duplicate entries in the strategie clock -> clean them
-        strat_clk = np.unique(strat_clk)
-
         if num_back is None:
             num_back = len(master_clock)
 

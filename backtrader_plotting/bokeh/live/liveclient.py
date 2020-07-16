@@ -138,7 +138,8 @@ class LiveClient:
     # region Functions to actually push data to the CDS
     def push_full_refresh(self, fulldata: pd.DataFrame):
         cds = self._figurepage.cds
-        update_pkg = {c: fulldata[c] for c in cds.column_names}
+        update_pkg = {c: fulldata[c].to_numpy() for c in cds.column_names}
+        logger.info(f"Sending full update: {update_pkg}")
         self._figurepage.cds.data.update(update_pkg)
 
     def push_patches(self, patch_pkgs):

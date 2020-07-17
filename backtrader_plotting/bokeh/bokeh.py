@@ -260,8 +260,9 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # configure xaxis visibility
         if self.p.scheme.xaxis_pos == "bottom":
+            last_idx = len(strat_figures) - 1
             for i, f in enumerate(strat_figures):
-                f.figure.xaxis.visible = False if i <= len(strat_figures) else True
+                f.figure.xaxis.visible = False if i < last_idx else True
 
         hoverc.apply_hovertips(strat_figures)
 

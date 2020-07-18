@@ -261,9 +261,14 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # configure xaxis visibility
         if self.p.scheme.xaxis_pos == "bottom":
-            last_idx = len(strat_figures) - 1
+            # only show xaxis for last figure
             for i, f in enumerate(strat_figures):
-                f.figure.xaxis.visible = False if i < last_idx else True
+                f.figure.xaxis.visible = False if i < len(strat_figures) - 1 else True
+        elif self.p.scheme.xaxis_pos == "all":
+            # just show xaxis for all figures
+            pass
+        else:
+            raise RuntimeError(f'Unpexted value for xaxis_pos: "{self.p.scheme.xaxis_pos}"')
 
         hoverc.apply_hovertips(strat_figures)
 

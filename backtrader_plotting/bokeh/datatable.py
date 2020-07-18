@@ -53,7 +53,7 @@ class TableGenerator(object):
         else:
             raise Exception(f"Unsupported ColumnDataType: '{ctype}'")
 
-    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer, table_width) -> (Paragraph, List[DataTable]):
+    def get_analyzers_tables(self, analyzer: bt.analyzers.Analyzer) -> (Paragraph, List[DataTable]):
         """Return a header for this analyzer and one *or more* data tables."""
         if hasattr(analyzer, 'get_analysis_table'):
             title, table_columns_list = analyzer.get_analysis_table()
@@ -74,5 +74,5 @@ class TableGenerator(object):
                 cds.add(c[2:], col_name)
                 columns.append(TableColumn(field=col_name, title=c[0], formatter=self._get_formatter(c[1])))
             column_height = len(table_columns[0]) * 25
-            elems.append(DataTable(source=cds, columns=columns, index_position=None, width=table_width, height=column_height))
+            elems.append(DataTable(source=cds, columns=columns, index_position=None, height=column_height))
         return Paragraph(text=title, style={'font-size': 'large'}), elems

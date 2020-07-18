@@ -399,16 +399,14 @@ class Bokeh(metaclass=bt.MetaParams):
         if len(analyzers) == 0:
             return None
 
-        table_width = int(self.p.scheme.analyzer_tab_width / self.p.scheme.analyzer_tab_num_cols)
-
         acolumns = []
         for analyzer in analyzers:
-            table_header, elements = self._tablegen.get_analyzers_tables(analyzer, table_width)
+            table_header, elements = self._tablegen.get_analyzers_tables(analyzer)
 
-            acolumns.append(column([table_header] + elements))
+            acolumns.append(column([table_header] + elements, sizing_mode='stretch_width'))
 
-        childs = gridplot(acolumns, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None})
-        return Panel(child=childs, title='Analyzers')
+        root = gridplot(acolumns, ncols=self.p.scheme.analyzer_tab_num_cols, toolbar_options={'logo': None}, sizing_mode='stretch_width')
+        return Panel(child=root, title='Analyzers')
 
     def _output_stylesheet(self, template="basic.css.j2"):
         return generate_stylesheet(self.p.scheme, template)

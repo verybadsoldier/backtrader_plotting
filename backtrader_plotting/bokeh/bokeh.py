@@ -237,18 +237,18 @@ class Bokeh(metaclass=bt.MetaParams):
         # reset hover container to not mix hovers with other strategies
         hoverc = HoverContainer(hover_tooltip_config=self.p.scheme.hover_tooltip_config, is_multidata=len(strategy.datas) > 1)
 
-        strat_figures = []
+        strat_figureenvs: List[FigureEnvelope] = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
-            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
+            figureenv = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder, len(strategy.datas) > 1)
 
-            figure.plot(master)
+            figureenv.plot(master)
 
             for s in slaves:
-                figure.plot(s)
-            strat_figures.append(figure)
+                figureenv.plot(s)
+            strat_figureenvs.append(figureenv)
 
-        for f in strat_figures:
+        for f in strat_figureenvs:
             f.figure.legend.click_policy = self.p.scheme.legend_click
             f.figure.legend.location = self.p.scheme.legend_location
             f.figure.legend.background_fill_color = self.p.scheme.legend_background_color
@@ -256,30 +256,19 @@ class Bokeh(metaclass=bt.MetaParams):
             f.figure.legend.orientation = self.p.scheme.legend_orientation
 
         # link axis
-        for i in range(1, len(strat_figures)):
-            strat_figures[i].figure.x_range = strat_figures[0].figure.x_range
+        for i in range(1, len(strat_figureenvs)):
+            strat_figureenvs[i].figure.x_range = strat_figureenvs[0].figure.x_range
 
-        # configure xaxis visibility
-        if self.p.scheme.xaxis_pos == "bottom":
-            # only show xaxis for last figure
-            for i, f in enumerate(strat_figures):
-                f.figure.xaxis.visible = False if i < len(strat_figures) - 1 else True
-        elif self.p.scheme.xaxis_pos == "all":
-            # just show xaxis for all figures
-            pass
-        else:
-            raise RuntimeError(f'Unpexted value for xaxis_pos: "{self.p.scheme.xaxis_pos}"')
+        hoverc.apply_hovertips(strat_figureenvs)
 
-        hoverc.apply_hovertips(strat_figures)
-
-        self._cur_figurepage.figure_envs += strat_figures
+        self._cur_figurepage.figure_envs += strat_figureenvs
 
         # volume graphs
         for v in volume_graph:
             plotorder = getattr(v.plotinfo, 'plotorder', 0)
-            figure = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, is_multidata=len(strategy.datas) > 1)
-            figure.plot_volume(v)
-            self._cur_figurepage.figure_envs.append(figure)
+            figureenv = FigureEnvelope(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, v, plotorder, is_multidata=len(strategy.datas) > 1)
+            figureenv.plot_volume(v)
+            self._cur_figurepage.figure_envs.append(figureenv)
 
     def plot_and_generate_optmodel(self, obj: Union[bt.Strategy, bt.OptReturn]):
         self._reset()
@@ -341,6 +330,19 @@ class Bokeh(metaclass=bt.MetaParams):
         else:
             raise RuntimeError(f'Invalid tabs parameter "{self.p.scheme.tabs}"')
 
+    def _on_post_generate_tab(self, tab_name: str, figureenvs: List[FigureEnvelope]):
+        """Configure figures after tabs have been assigned"""
+        # configure xaxis visibility
+        if self.p.scheme.xaxis_pos == "bottom":
+            # only show xaxis for last figure
+            for i, f in enumerate(figureenvs):
+                f.figure.xaxis.visible = False if i < len(figureenvs) - 1 else True
+        elif self.p.scheme.xaxis_pos == "all":
+            # just show xaxis for all figures
+            pass
+        else:
+            raise RuntimeError(f'Unpexted value for xaxis_pos: "{self.p.scheme.xaxis_pos}"')
+
     def generate_model_tabs(self, fp: FigurePage, tradingdomain=None) -> List[Panel]:
         observers = [x for x in fp.figure_envs if isinstance(x.master, bt.Observer)]
         datas = [x for x in fp.figure_envs if isinstance(x.master, bt.AbstractDataBase)]
@@ -348,14 +350,14 @@ class Bokeh(metaclass=bt.MetaParams):
 
         # now assign figures to tabs
         # 1. assign default tabs if no manual tab is assigned
-        for figure in [x for x in datas if x.plottab is None]:
-            figure.plottab = 'Plots' if self.is_tabs_single else 'Datas'
+        for figureenv in [x for x in datas if x.plottab is None]:
+            figureenv.plottab = 'Plots' if self.is_tabs_single else 'Datas'
 
-        for figure in [x for x in inds if x.plottab is None]:
-            figure.plottab = 'Plots' if self.is_tabs_single else 'Indicators'
+        for figureenv in [x for x in inds if x.plottab is None]:
+            figureenv.plottab = 'Plots' if self.is_tabs_single else 'Indicators'
 
-        for figure in [x for x in observers if x.plottab is None]:
-            figure.plottab = 'Plots' if self.is_tabs_single else 'Observers'
+        for figureenv in [x for x in observers if x.plottab is None]:
+            figureenv.plottab = 'Plots' if self.is_tabs_single else 'Observers'
 
         # 2. group panels by desired tabs
         # groupby expects the groups to be sorted or else will produce duplicated groups
@@ -388,10 +390,10 @@ class Bokeh(metaclass=bt.MetaParams):
                          sizing_mode=self.p.scheme.plot_sizing_mode,
                          )
             panels.append(Panel(title=panel_title, child=g))
+            self._on_post_generate_tab(panel_title, objects)
 
         for tabname, figures in tabgroups:
             build_panel(list(figures), tabname)
-
         return panels
     # endregion
 

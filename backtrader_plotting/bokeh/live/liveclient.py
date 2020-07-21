@@ -57,8 +57,15 @@ class LiveClient:
         # append meta tab
         meta = Div(text=metadata.get_metadata_div(strategy))
         self._panel_metadata = Panel(child=meta, title="Meta")
+        self.last_clock = 0.0
 
         self._refreshmodel()
+
+    @property
+    def last_index(self):
+        if len(self._figurepage.cds.data['index']) == 0:
+            return None
+        return int(self._figurepage.cds.data['index'][-1])
 
     def add_fullrefresh_callback(self, cb: Callable, timeout: int):
         if self._callback_fullrefresh is not None:
@@ -68,13 +75,6 @@ class LiveClient:
                 # ignore error when timeout was already removed
                 pass
         self._callback_fullrefresh = self.document.add_timeout_callback(cb, timeout)
-
-    @property
-    def last_index(self):
-        """Return -1 in case of no data yet (basically to make greater-operator work."""
-        if len(self._figurepage.cds.data['index']) == 0:
-            return -1
-        return self._figurepage.cds.data['index'][-1]
 
     def _refreshmodel(self):
         self._bokeh = self._bokeh_fac()

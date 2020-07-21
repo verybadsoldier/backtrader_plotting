@@ -37,10 +37,9 @@ class PlotListener(bt.ListenerBase):
     )
 
     class UpdateType(Enum):
-        ADD = 1,
+        APPEND = 1,
         UPDATE_LAST = 2,
-        FILL = 3,
-        FULL_REFRESH = 4,
+        FILL_OR_PREPEND = 3,
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
@@ -108,14 +107,21 @@ class PlotListener(bt.ListenerBase):
         with self._lock:
             client: LiveClient = self._clients[document.session_context.id]
             # updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
-            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
-
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['master_clock'] > client.last_clock]
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:
                 return
 
-            updatepkg = ColumnDataSource.from_df(updatepkg_df)
+            client.last_clock = self._datastore['master_clock'].iloc[-1]
 
+            last_idx = client.last_index
+            if last_idx is None:
+                last_idx = 0
+
+            # make indices adjascent to existing indices (needed after a prepend happend)
+            updatepkg_df = updatepkg_df.assign(index=range(last_idx + 1, last_idx + 1 + len(updatepkg_df)))
+
+            updatepkg = ColumnDataSource.from_df(updatepkg_df)
             client.push_adds(updatepkg)
 
     def _bokeh_full_refresh(self):
@@ -210,36 +216,37 @@ class PlotListener(bt.ListenerBase):
             return self.UpdateType.UPDATE_LAST
         else:
             assert len(strategy) > self._prev_strategy_len
-            if len(strategy) > 1 and strategy.datetime[0] == strategy.datetime[-1] and self._datastore.shape[0] > 0:
-                return self.UpdateType.FULL_REFRESH
+            if len(strategy) == 1 or self._datastore['datetime'].iloc[-1] != bt.num2date(strategy.datetime[0]):
+                return self.UpdateType.APPEND
+            elif self._datastore['datetime'].iloc[-1] == bt.num2date(strategy.datetime[0]):
+                # either data was added to the front or data in between was filled
+                return self.UpdateType.FILL_OR_PREPEND
             else:
-                return self.UpdateType.ADD
+                raise RuntimeError('Update type detection failed')
 
     def next(self):
-        strategy = self._cerebro.runningstrats[self.p.strategyidx]
-        update_type = self._detect_update_type(strategy)
-        self._prev_strategy_len = len(strategy)
+        with self._lock:
+            strategy = self._cerebro.runningstrats[self.p.strategyidx]
+            update_type = self._detect_update_type(strategy)
+            self._prev_strategy_len = len(strategy)
 
-        if update_type in [self.UpdateType.UPDATE_LAST, self.UpdateType.FILL, self.UpdateType.FULL_REFRESH]:
-            with self._lock:
+            if update_type in [self.UpdateType.UPDATE_LAST, self.UpdateType.FILL_OR_PREPEND]:
                 fulldata = self._bokeh.build_strategy_data(strategy)
 
-                if update_type == self.UpdateType.FILL:
-                    self._update_fill(fulldata)
-                elif update_type == self.UpdateType.UPDATE_LAST:
+                if update_type == self.UpdateType.UPDATE_LAST:
                     self._update_last(fulldata)
-                elif update_type == self.UpdateType.FULL_REFRESH:
+                elif update_type == self.UpdateType.FILL_OR_PREPEND:
                     self._datastore = fulldata
                     for client in self._clients.values():
-                        client.add_fullrefresh_callback(self._bokeh_full_refresh, 500)
+                        _logger.info('Adding full refersh callback')
+                        client.add_fullrefresh_callback(self._bokeh_full_refresh, 3000)
                     return
                 else:
                     raise RuntimeError(f'Unexpected update_type: {update_type}')
 
                 for client in self._clients.values():
                     client.document.add_next_tick_callback(self._bokeh_cb_push_patches)
-        elif update_type == self.UpdateType.ADD:
-            with self._lock:
+            elif update_type == self.UpdateType.APPEND:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
 
                 num_back = 1 if self._datastore.shape[0] > 0 else None  # if we have NO data yet then fetch all (first call)
@@ -260,5 +267,5 @@ class PlotListener(bt.ListenerBase):
                         # there was no callback to remove
                         pass
                     doc.add_next_tick_callback(self._bokeh_cb_push_adds)
-        else:
-            raise RuntimeError(f'Unexepected update_type: {update_type}')
+            else:
+                raise RuntimeError(f'Unexepected update_type: {update_type}')

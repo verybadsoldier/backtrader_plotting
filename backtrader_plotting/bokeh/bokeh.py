@@ -26,13 +26,14 @@ from bokeh.util.browser import view
 from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
-from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indicator_data, get_tradingdomain, get_plottype, PlotType
+from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indicator_data, get_tradingdomain, get_plottype, PlotType, get_plotlineinfo
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting.schemes.scheme import Scheme
 from backtrader_plotting.html import metadata
+import operator
 
 _logger = logging.getLogger(__name__)
 
@@ -503,6 +504,31 @@ class Bokeh(metaclass=bt.MetaParams):
                 line_clk = get_clock_line(obj).plotrange(start, end)
                 dataline = convert_to_master_clock(dataline, line_clk, master_clock, forward_fill=plottype == PlotType.LINE)
                 strategydf[source_id] = dataline
+
+                if isinstance(obj, bt.IndicatorBase):
+                    for fcmp, fop in (('_gt', operator.gt), ('_lt', operator.lt), ('', None),):
+                        if fop is None:
+                            continue  # we only need to take care when operator is used
+
+                        lineplotinfo = get_plotlineinfo(obj, lineidx)
+
+                        fattr = '_fill' + fcmp
+                        fref, fcol = lineplotinfo._get(fattr, (None, None))
+                        if fref is None:
+                            continue
+                        if isinstance(fref, int):
+                            y2 = fref  # static value
+                        elif isinstance(fref, str):
+                            l2 = getattr(obj, fref)
+                            y2 = FigureEnvelope._source_id(l2)
+                        else:
+                            raise RuntimeError('Unsupported fref')
+
+                        lineid = source_id + fattr
+
+                        npdataline = np.array(dataline)
+                        new_line = np.where(fop(npdataline, y2), npdataline, y2)
+                        strategydf[lineid] = new_line
 
         # apply a proper index (should be identical to 'index' column)
         if strategydf.shape[0] > 0:

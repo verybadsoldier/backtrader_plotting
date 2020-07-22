@@ -1,5 +1,6 @@
 import collections
 import itertools
+import operator
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -10,10 +11,8 @@ import pandas as pd
 
 from bokeh.models import Span
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, CrosshairTool
-from bokeh.models import LinearAxis, DataRange1d, Renderer
+from bokeh.models import HoverTool, CrosshairTool, VArea, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 from bokeh.models.formatters import NumeralTickFormatter
-from bokeh.models import ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
@@ -476,7 +475,6 @@ class FigureEnvelope(object):
                         raise Exception(
                             "Sorry, unsupported marker:"
                             + f" '{marker}'. Please report to GitHub.")
-                        return
                 # set kwglyph values
                 kwglyphs['y'] = source_id
                 for v in attrs:
@@ -527,6 +525,39 @@ class FigureEnvelope(object):
                 raise Exception(f"Unknown plotting method '{method}'")
 
             renderer = glyph_fnc("index", source=self._cds, **kwglyphs)
+
+            # Area plots
+            for fcmp, fop in (('_gt', operator.gt), ('_lt', operator.lt), ('', None),):
+                fattr = '_fill' + fcmp
+                fref, fcol = lineplotinfo._get(fattr, (None, None))
+
+                if fref is None:
+                    continue
+
+                # fcol can be a tuple/list to also specifyy alpha
+                if isinstance(fcol, (list, tuple)):
+                    fcol, falpha = fcol
+                else:
+                    falpha = self._scheme.fillalpha
+
+                if isinstance(fref, int):
+                    y2 = fref  # static value
+                elif isinstance(fref, str):
+                    l2 = getattr(obj, fref)
+                    y2 = FigureEnvelope._source_id(l2)
+                else:
+                    raise RuntimeError('Unsupported fref')
+
+                if fop is not None:
+                    # we need to build a custom data line applying the operator
+                    y1 = source_id + fattr
+                else:
+                    # we can use the original data as is
+                    y1 = source_id
+
+                self._add_column(y1, np.float64)
+
+                self.figure.varea('index', source=self._cds, y1=y1, y2=y2, fill_color=fcol, fill_alpha=falpha)
 
             # make sure the regular y-axis only scales to the normal data (data + ind/obs) on 1st axis (not to e.g. volume data on 2nd axis)
             self.figure.y_range.renderers.append(renderer)

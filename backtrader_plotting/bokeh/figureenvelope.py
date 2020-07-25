@@ -11,13 +11,13 @@ import pandas as pd
 
 from bokeh.models import Span
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, CrosshairTool, VArea, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
+from bokeh.models import HoverTool, CrosshairTool, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 from bokeh.models.formatters import NumeralTickFormatter
 
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
-from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain
+from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain, get_ind_areas, get_source_id
 from backtrader_plotting.bokeh.marker import get_marker_info
 
 
@@ -332,7 +332,7 @@ class FigureEnvelope(object):
             self._cds.add(np.array([], dtype=dtype), name)
 
     def plot_data(self, data: bt.AbstractDataBase):
-        source_id = FigureEnvelope._source_id(data)
+        source_id = get_source_id(data)
         title = sanitize_source_name(label_resolver.datatarget2label([data]))
 
         # append to title
@@ -381,7 +381,7 @@ class FigureEnvelope(object):
 
     def plot_volume(self, data: bt.AbstractDataBase, alpha=1.0, extra_axis=False):
         """extra_axis displays a second axis (for overlay on data plotting)"""
-        source_id = FigureEnvelope._source_id(data)
+        source_id = get_source_id(data)
 
         self._add_columns([(source_id + 'volume', np.float64), (source_id + 'colors_volume', np.object)])
         kwargs = {'fill_alpha': alpha,
@@ -434,7 +434,7 @@ class FigureEnvelope(object):
         is_multiline = obj.size() > 1
         for lineidx in range(obj.size()):
             line = obj.lines[lineidx]
-            source_id = FigureEnvelope._source_id(line)
+            source_id = get_source_id(line)
             linealias = obj.lines._getlinealias(lineidx)
 
             lineplotinfo = get_plotlineinfo(obj, lineidx)
@@ -526,36 +526,13 @@ class FigureEnvelope(object):
 
             renderer = glyph_fnc("index", source=self._cds, **kwglyphs)
 
-            # Area plots
-            for fcmp, fop in (('_gt', operator.gt), ('_lt', operator.lt), ('', None),):
-                fattr = '_fill' + fcmp
-                fref, fcol = lineplotinfo._get(fattr, (None, None))
-
-                if fref is None:
-                    continue
-
-                # fcol can be a tuple/list to also specifyy alpha
-                if isinstance(fcol, (list, tuple)):
-                    fcol, falpha = fcol
-                else:
-                    falpha = self._scheme.fillalpha
-
-                if isinstance(fref, int):
-                    y2 = fref  # static value
-                elif isinstance(fref, str):
-                    l2 = getattr(obj, fref)
-                    y2 = FigureEnvelope._source_id(l2)
-                else:
-                    raise RuntimeError('Unsupported fref')
-
-                if fop is not None:
-                    # we need to build a custom data line applying the operator
-                    y1 = source_id + fattr
-                else:
-                    # we can use the original data as is
-                    y1 = source_id
-
+            # iterate again to generate area plot data
+            for fattr, y1, y2, fcol, falpha, fop in get_ind_areas(obj, lineidx):
                 self._add_column(y1, np.float64)
+
+                falpha = falpha or self._scheme.fillalpha
+
+                fcol = convert_color(fcol)
 
                 self.figure.varea('index', source=self._cds, y1=y1, y2=y2, fill_color=fcol, fill_alpha=falpha)
 
@@ -610,6 +587,3 @@ class FigureEnvelope(object):
             return
         self._cds.add(data, name)
 
-    @staticmethod
-    def _source_id(source):
-        return str(id(source))

@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 import logging
 import math
+import operator
 from typing import Dict, Optional, List, Union
 
 import backtrader as bt
@@ -209,3 +210,53 @@ def get_plotlineinfo(obj, lineidx):
     if not lineplotinfo:
         lineplotinfo = bt.AutoInfoClass()
     return lineplotinfo
+
+
+def get_source_id(obj) -> str:
+    return str(id(obj))
+
+
+def get_ind_areas(ind, lineidx):
+    """Generates indicator area information to support _fill_gt and _fill_lt"""
+    line = ind.lines[lineidx]
+    source_id = get_source_id(line)
+    lineplotinfo = get_plotlineinfo(ind, lineidx)
+    alpha = None
+
+    for suffix, comp_op in (('_gt', operator.gt), ('_lt', operator.lt), ('', None),):
+        attr_name = '_fill' + suffix
+        ref, color = lineplotinfo._get(attr_name, (None, None))
+
+        if ref is None:
+            continue
+
+        # fcol can be a tuple/list to also specifyy alpha
+        if isinstance(color, (list, tuple)):
+            color, alpha = color
+
+        if isinstance(ref, int):
+            y2 = ref  # static value
+        elif isinstance(ref, str):
+            # ref to another line
+            l2 = getattr(ind.lines, ref)
+            y2 = get_source_id(l2)
+        else:
+            raise RuntimeError('Unsupported fref')
+
+        if comp_op is not None:
+            # we need to build a custom data line applying the operator
+            y1 = source_id + attr_name
+        else:
+            # we can use the original data as is
+            y1 = source_id
+
+        yield attr_name, y1, y2, color, alpha, comp_op
+
+
+def get_lines(obj):
+    """Generates all lines of an object yielding their indices, line object and the corresponding source id"""
+    num_lines = obj.size() if getattr(obj, 'size', None) else 1
+    for lineidx in range(num_lines):
+        line = obj.lines[lineidx]
+        source_id = get_source_id(line)
+        yield lineidx, line, source_id

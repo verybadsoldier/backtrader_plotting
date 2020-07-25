@@ -26,7 +26,7 @@ from bokeh.util.browser import view
 from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
-from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indicator_data, get_tradingdomain, get_plottype, PlotType, get_plotlineinfo
+from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indicator_data, get_tradingdomain, get_plottype, PlotType, get_plotlineinfo, get_source_id, get_ind_areas, get_lines
 from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.figureenvelope import FigureEnvelope, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
@@ -484,7 +484,7 @@ class Bokeh(metaclass=bt.MetaParams):
         strategydf['datetime'] = dtline
 
         for data in strategy.datas:
-            source_id = FigureEnvelope._source_id(data)
+            source_id = get_source_id(data)
             df_data = convert_to_pandas(master_clock, data, start, end, source_id)
 
             strategydf = strategydf.join(df_data)
@@ -493,10 +493,7 @@ class Bokeh(metaclass=bt.MetaParams):
             strategydf = strategydf.join(df_colors)
 
         for obj in itertools.chain(strategy.getindicators(), strategy.getobservers()):
-            num_lines = obj.size() if getattr(obj, 'size', None) else 1
-            for lineidx in range(num_lines):
-                line = obj.lines[lineidx]
-                source_id = FigureEnvelope._source_id(line)
+            for lineidx, line, source_id in get_lines(obj):
                 dataline = line.plotrange(start, end)
 
                 plottype = get_plottype(obj, lineidx)
@@ -505,30 +502,24 @@ class Bokeh(metaclass=bt.MetaParams):
                 dataline = convert_to_master_clock(dataline, line_clk, master_clock, forward_fill=plottype == PlotType.LINE)
                 strategydf[source_id] = dataline
 
-                if isinstance(obj, bt.IndicatorBase):
-                    for fcmp, fop in (('_gt', operator.gt), ('_lt', operator.lt), ('', None),):
-                        if fop is None:
-                            continue  # we only need to take care when operator is used
+        # now iterate again over indicators to calculate area plots (_fill_gt / _fill_lt)
+        for ind in strategy.getindicators():
+            for lineidx, line, source_id in get_lines(ind):
+                for fattr, _, y2, _, _, fop in get_ind_areas(ind, lineidx):
+                    if fop is None:
+                        continue  # we only need to take care when operator is used
 
-                        lineplotinfo = get_plotlineinfo(obj, lineidx)
+                    if isinstance(y2, int):
+                        # scalar value
+                        pass
+                    elif isinstance(y2, str):
+                        y2 = strategydf[y2]
+                    else:
+                        raise RuntimeError('Unexpected type')
 
-                        fattr = '_fill' + fcmp
-                        fref, fcol = lineplotinfo._get(fattr, (None, None))
-                        if fref is None:
-                            continue
-                        if isinstance(fref, int):
-                            y2 = fref  # static value
-                        elif isinstance(fref, str):
-                            l2 = getattr(obj, fref)
-                            y2 = FigureEnvelope._source_id(l2)
-                        else:
-                            raise RuntimeError('Unsupported fref')
-
-                        lineid = source_id + fattr
-
-                        npdataline = np.array(dataline)
-                        new_line = np.where(fop(npdataline, y2), npdataline, y2)
-                        strategydf[lineid] = new_line
+                    dataline_pd = pd.Series(strategydf[source_id])
+                    lineid = source_id + fattr
+                    strategydf[lineid] = dataline_pd.where(fop(dataline_pd, y2), y2).to_numpy()
 
         # apply a proper index (should be identical to 'index' column)
         if strategydf.shape[0] > 0:

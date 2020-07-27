@@ -1,9 +1,10 @@
 import asyncio
 from collections import defaultdict
 from enum import Enum
+from datetime import datetime
 import logging
 from threading import Lock
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import threading
 
 import numpy as np
@@ -24,6 +25,13 @@ import pandas
 import tornado.ioloop
 
 _logger = logging.getLogger(__name__)
+
+
+class _PatchPackage:
+    def __init__(self, column_name: str, dt: datetime, value):
+        self.column_name: str = column_name
+        self.value = value
+        self.datetime: datetime = dt  # if this is None then it will update the last data
 
 
 class PlotListener(bt.ListenerBase):
@@ -54,9 +62,12 @@ class PlotListener(bt.ListenerBase):
         self._clients: Dict[str, LiveClient] = {}
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
-        self._patch_pkgs = defaultdict(lambda: [])
         self._pkgs_insert = defaultdict(lambda: [])
         self._prev_strategy_len = 0
+        self._reset_patch_pkgs()
+
+    def _reset_patch_pkgs(self):
+        self._patch_pkgs: Dict[str, Dict[str, Any]] = defaultdict(lambda: {})
 
     def _create_bokeh(self):
         return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)  # get a copy of the scheme so we can modify it per client
@@ -106,7 +117,6 @@ class PlotListener(bt.ListenerBase):
 
         with self._lock:
             client: LiveClient = self._clients[document.session_context.id]
-            # updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
             updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['master_clock'] > client.last_clock]
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:
@@ -131,83 +141,38 @@ class PlotListener(bt.ListenerBase):
             client: LiveClient = self._clients[session_id]
             client.push_full_refresh(self._datastore)
 
+            client.last_clock = self._datastore['master_clock'].iloc[-1]
+
+            # remove any pending patch packages as we just have issued a full update
+            self._reset_patch_pkgs()
+
     def _bokeh_cb_push_patches(self):
         document = curdoc()
         session_id = document.session_context.id
         with self._lock:
             client: LiveClient = self._clients[session_id]
 
+            client.last_clock = self._datastore['master_clock'].iloc[-1]
+
             patch_pkgs = self._patch_pkgs[session_id]
-            self._patch_pkgs[session_id] = []
+            self._patch_pkgs[session_id] = {}  # reset
             _logger.info("Patch pkg: " + str(patch_pkgs))
             client.push_patches(patch_pkgs)
 
-    def _bokeh_cb_push_last(self):
-        document = curdoc()
-        session_id = document.session_context.id
-        with self._lock:
-            client: LiveClient = self._clients[session_id]
-
-            patch_pkgs = self._patch_pkgs[session_id]
-            self._patch_pkgs[session_id] = []
-            _logger.info("Patch pkg: " + str(patch_pkgs))
-            client.push_patches(patch_pkgs)
-
-    def _bokeh_cb_push_inserts(self, bootstrap_document=None):
-        document = curdoc()
-        session_id = document.session_context.id
-        with self._lock:
-            client: LiveClient = self._clients[session_id]
-
-            pkg_insert = self._pkgs_insert[session_id]
-            self._pkgs_insert[session_id] = []
-            _logger.info("Insert pkg: " + str(pkg_insert))
-            client.push_insert(pkg_insert)
-
-    def _update_last(self, fulldata):
-        last_row = fulldata.tail(1)
-        for column_name in last_row.columns:
-            if column_name in ['index']:
-                continue
-            d = last_row[column_name].iloc[0]
+    def _queue_patch_pkg(self, current_frame):
+        """self._lock should be locked"""
+        last_index = self._datastore.index[-1]
+        for column_name in current_frame.columns:
+            d = current_frame[column_name].iloc[0]
             if isinstance(d, float) and np.isnan(d):
                 continue
-            self._datastore.at[self._datastore.index[-1], column_name] = d  # update data in datastore
+            self._datastore.at[last_index, column_name] = d  # update data in datastore
             for sess_id in self._clients.keys():
-                self._patch_pkgs[sess_id].append((column_name, None, d))
+                self._patch_pkgs[sess_id][column_name] = d
 
                 # WIP: make curernt bar outline red
                 # if column_name.endswith('outline'):
                 #    self._patch_pkgs[sess_id].append((column_name, None, '#ff0000'))
-
-    def _update_fill(self, fulldata):
-        # generate series with number of missing values per column
-        new_count = fulldata.isnull().sum()
-        cur_count = self._datastore.isnull().sum()
-
-        # boolean series that indicates which column is missing data
-        patched_cols = new_count != cur_count
-
-        # get dataframe with only those columns that added data
-        patchcols = fulldata[fulldata.columns[patched_cols]]
-        for column_name in patchcols.columns:
-            for index, row in self._datastore.iterrows():
-                # compare all values in this column
-                od = row[column_name]
-                odt = row['datetime']
-                d = fulldata[column_name][index]
-                dt = fulldata['datetime'][index]
-
-                assert odt == dt
-
-                # if value is different then put to patch package
-                # either it WAS NaN and it's not anymore
-                # or both not NaN but different now
-                # and don't count it as True when both are NaN
-                if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                    self._datastore.at[index, column_name] = d  # update data in datastore
-                    for sess_id in self._clients.keys():
-                        self._patch_pkgs[sess_id].append((column_name, odt, d))
 
     def _detect_update_type(self, strategy):
         # treat as update of old data if strategy datetime is duplicated and we have already data stored
@@ -230,22 +195,18 @@ class PlotListener(bt.ListenerBase):
             update_type = self._detect_update_type(strategy)
             self._prev_strategy_len = len(strategy)
 
-            if update_type in [self.UpdateType.UPDATE_LAST, self.UpdateType.FILL_OR_PREPEND]:
-                fulldata = self._bokeh.build_strategy_data(strategy)
-
-                if update_type == self.UpdateType.UPDATE_LAST:
-                    self._update_last(fulldata)
-                elif update_type == self.UpdateType.FILL_OR_PREPEND:
-                    self._datastore = fulldata
-                    for client in self._clients.values():
-                        _logger.info('Adding full refersh callback')
-                        client.add_fullrefresh_callback(self._bokeh_full_refresh, 3000)
-                    return
-                else:
-                    raise RuntimeError(f'Unexpected update_type: {update_type}')
-
+            _logger.info(f"next: update type: {update_type}")
+            if update_type == self.UpdateType.UPDATE_LAST:
+                startidx = int(self._datastore['index'].iloc[-1])
+                current_frame = self._bokeh.build_strategy_data(strategy, num_back=1, startidx=startidx)
+                self._queue_patch_pkg(current_frame)
                 for client in self._clients.values():
                     client.document.add_next_tick_callback(self._bokeh_cb_push_patches)
+            elif update_type == self.UpdateType.FILL_OR_PREPEND:
+                self._datastore = self._bokeh.build_strategy_data(strategy)
+                for client in self._clients.values():
+                    _logger.info('Adding full refersh callback')
+                    client.add_fullrefresh_callback(self._bokeh_full_refresh, 500)
             elif update_type == self.UpdateType.APPEND:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
 

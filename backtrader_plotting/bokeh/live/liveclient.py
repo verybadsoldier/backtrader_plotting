@@ -2,7 +2,7 @@ from collections import defaultdict
 from copy import copy
 from datetime import datetime, timedelta
 import logging
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
 import backtrader as bt
 
@@ -137,26 +137,26 @@ class LiveClient:
 
     # region Functions to actually push data to the CDS
     def push_full_refresh(self, fulldata: pd.DataFrame):
+        full_pkg = {c: fulldata[c].to_numpy() for c in self._figurepage.cds.column_names}
+        _logger.info(f"Sending full refresh package: {full_pkg}")
+        self._figurepage.cds.data.update(full_pkg)
+
+    def push_patches(self, patch_pkg: Dict[str, Any]):
         cds = self._figurepage.cds
-        update_pkg = {c: fulldata[c].to_numpy() for c in cds.column_names}
-        _logger.info(f"Sending full update: {update_pkg}")
-        self._figurepage.cds.data.update(update_pkg)
 
-    def push_patches(self, patch_pkgs):
-        cds = self._figurepage.cds
+        #idx = np.where(cds.data['index'] == patch_pkg['index'])
+        idx = len(cds.data['index']) - 1
 
-        dt_idx_map = {d: idx for idx, d in enumerate(cds.data['datetime'])}
-
+        # we build the actual object that is pushed to the browser
         patch_dict = defaultdict(list)
-        for colname, dt, val in patch_pkgs:
-            if colname not in cds.data:
+        for c, v in patch_pkg.items():
+            if c == 'index':
                 continue
-            if dt is None:
-                idx = int(cds.data['index'][-1])
-            else:
-                idx = dt_idx_map[dt.to_datetime64()]
 
-            patch_dict[colname].append((idx, val))
+            if c not in cds.data:
+                continue  # skip columns not existing in the current client data
+
+            patch_dict[c].append((idx, v))
         _logger.info(f"Sending patch dict: {patch_dict}")
 
         cds.patch(patch_dict)
@@ -171,14 +171,4 @@ class LiveClient:
 
         _logger.info(f'Sending stream package: {sendpkg}')
         cds.stream(sendpkg, self._lookback)
-
-    def push_insert(self, package: Dict[str, Any], position: int = 0):
-        cds = self._figurepage.cds
-
-        update_pkg = {}
-        for c in package.keys():
-            if c not in cds.data:
-                continue
-            update_pkg[c] = np.insert(cds.data[c], position, package[c])
-        self._figurepage.cds.data.update(update_pkg)
     # endregion

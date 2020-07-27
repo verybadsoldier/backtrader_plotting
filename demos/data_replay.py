@@ -32,10 +32,12 @@ class LiveDemoStrategy(bt.Strategy):
         pos = len(self.data)
         if pos % self.p.modbuy == 0:
             if self.broker.getposition(self.datas[0]).size == 0:
+                _logger.info("BUY")
                 self.buy(self.datas[0], size=None)
 
         if pos % self.p.modsell == 0:
             if self.broker.getposition(self.datas[0]).size > 0:
+                _logger.info("SELL")
                 self.sell(self.datas[0], size=None)
 
 
@@ -107,7 +109,7 @@ if __name__ == '__main__':
                                    runtime_seconds=60000,
                                    tick_interval=datetime.timedelta(seconds=1),
                                    start_delays=[None, 13],
-                                   num_gen_bars=[0, 30],
-                                   num_data=2,
+                                   num_gen_bars=[10, 30],
+                                   num_data=1,
                                    trading_domains=[None, 'mydomain'],
                                    )

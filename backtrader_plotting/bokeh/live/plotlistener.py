@@ -117,19 +117,10 @@ class PlotListener(bt.ListenerBase):
 
         with self._lock:
             client: LiveClient = self._clients[document.session_context.id]
-            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['master_clock'] > client.last_clock]
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:
                 return
-
-            client.last_clock = self._datastore['master_clock'].iloc[-1]
-
-            last_idx = client.last_index
-            if last_idx is None:
-                last_idx = 0
-
-            # make indices adjascent to existing indices (needed after a prepend happend)
-            updatepkg_df = updatepkg_df.assign(index=range(last_idx + 1, last_idx + 1 + len(updatepkg_df)))
 
             updatepkg = ColumnDataSource.from_df(updatepkg_df)
             client.push_adds(updatepkg)
@@ -141,8 +132,6 @@ class PlotListener(bt.ListenerBase):
             client: LiveClient = self._clients[session_id]
             client.push_full_refresh(self._datastore)
 
-            client.last_clock = self._datastore['master_clock'].iloc[-1]
-
             # remove any pending patch packages as we just have issued a full update
             self._reset_patch_pkgs()
 
@@ -152,15 +141,12 @@ class PlotListener(bt.ListenerBase):
         with self._lock:
             client: LiveClient = self._clients[session_id]
 
-            client.last_clock = self._datastore['master_clock'].iloc[-1]
-
             patch_pkgs = self._patch_pkgs[session_id]
             self._patch_pkgs[session_id] = {}  # reset
             _logger.info("Patch pkg: " + str(patch_pkgs))
             client.push_patches(patch_pkgs)
 
     def _queue_patch_pkg(self, current_frame):
-        """self._lock should be locked"""
         last_index = self._datastore.index[-1]
         for column_name in current_frame.columns:
             d = current_frame[column_name].iloc[0]

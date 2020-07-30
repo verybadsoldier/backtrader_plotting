@@ -57,14 +57,13 @@ class LiveClient:
         # append meta tab
         meta = Div(text=metadata.get_metadata_div(strategy))
         self._panel_metadata = Panel(child=meta, title="Meta")
-        self.last_clock = 0.0
 
         self._refreshmodel()
 
     @property
     def last_index(self):
         if len(self._figurepage.cds.data['index']) == 0:
-            return None
+            return -1
         return int(self._figurepage.cds.data['index'][-1])
 
     def add_fullrefresh_callback(self, cb: Callable, timeout: int):
@@ -144,7 +143,6 @@ class LiveClient:
     def push_patches(self, patch_pkg: Dict[str, Any]):
         cds = self._figurepage.cds
 
-        #idx = np.where(cds.data['index'] == patch_pkg['index'])
         idx = len(cds.data['index']) - 1
 
         # we build the actual object that is pushed to the browser

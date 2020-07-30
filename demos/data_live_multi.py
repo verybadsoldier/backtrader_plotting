@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, print_function,
 import datetime
 import logging
 
-import backtrader as bt
-
 from utils import run_cerebro, LiveDemoStrategy
+
+import backtrader as bt
 
 
 if __name__ == '__main__':
@@ -17,10 +17,11 @@ if __name__ == '__main__':
                                  data_timeframes=bt.TimeFrame.Ticks,
                                  data_compressions=1,
                                  resample_timeframes=bt.TimeFrame.Seconds,
-                                 resample_compressions=5,
+                                 resample_compressions=[5, 10],
                                  runtime_secondss=60000,
                                  tick_intervals=datetime.timedelta(seconds=1),
-                                 start_delays=0,
-                                 num_gen_barss=0,
-                                 num_data=1,
+                                 start_delays=[None, None],
+                                 num_gen_barss=[0, 10],
+                                 num_data=2,
+                                 fnc_name='resampledata',
                                  )

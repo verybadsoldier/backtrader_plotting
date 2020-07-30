@@ -1,4 +1,5 @@
-from datetime import datetime
+import bisect
+import datetime
 from enum import Enum
 import logging
 import math
@@ -93,7 +94,7 @@ def convert_to_master_clock(line, line_clk, master_clock, forward_fill=False):
     return new_line
 
 
-def convert_to_pandas(master_clock, obj: bt.LineSeries, start: datetime = None, end: datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
+def convert_to_pandas(master_clock, obj: bt.LineSeries, start: datetime.datetime = None, end: datetime.datetime = None, name_prefix: str = "", num_back=None) -> pd.DataFrame:
     lines_clk = obj.lines.datetime.plotrange(start, end)
 
     df = pd.DataFrame()
@@ -134,6 +135,43 @@ def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase
     return clk.lines.datetime
 
 
+def build_master_clock(strategy: bt.Strategy,
+                       start: Optional[datetime.datetime] = None, end: Optional[datetime.datetime] = None,
+                       ):
+    """Build the master clock which is a clock line that is basically a merged line of all available clocks"""
+    master_clock = []
+    for obj in itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers()):
+        line_clk = get_clock_line(obj).plotrange(start, end)
+        master_clock += line_clk
+
+    # remove duplicates
+    master_clock = list(dict.fromkeys(master_clock))
+
+    master_clock.sort()
+
+    return master_clock
+
+
+def get_strategy_start_end(strategy, start, end):
+    """Get start and end indices for strategy."""
+    st_dtime = strategy.lines.datetime.array
+    if start is None:
+        start = 0
+    if end is None:
+        end = len(st_dtime)
+
+    if isinstance(start, datetime.date):
+        start = bisect.bisect_left(st_dtime, bt.date2num(start))
+
+    if isinstance(end, datetime.date):
+        end = bisect.bisect_right(st_dtime, bt.date2num(end))
+
+    if end < 0:
+        end = len(st_dtime) + 1 + end
+
+    return start, end
+
+
 def find_by_plotid(strategy: bt.Strategy, plotid):
     objs = itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers())
     founds = []
@@ -166,7 +204,7 @@ def get_plottype(obj, lineidx: int) -> PlotType:
     return PlotType.LINE if method == 'line' else PlotType.BAR
 
 
-def get_indicator_data(indicator: bt.Indicator):
+def get_indobs_dataobj(indicator: bt.Indicator):
     """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
     a LineSeriesStub has been created for which we have to resolve the original data"""
     data = indicator.data
@@ -187,7 +225,7 @@ def get_tradingdomain(obj) -> Union[str, bool]:
         return obj._name
     elif isinstance(obj, bt.IndicatorBase):
         # lets find the data the indicator is based on
-        data = get_indicator_data(obj)
+        data = get_indobs_dataobj(obj)
         return get_tradingdomain(data)
     elif isinstance(obj, bt.ObserverBase):
         # distinguish between observers related to data and strategy wide observers

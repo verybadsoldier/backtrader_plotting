@@ -19,103 +19,20 @@ from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
 from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain, get_ind_areas, get_source_id
 from backtrader_plotting.bokeh.marker import get_marker_info
+from backtrader_plotting.bokeh.hover_container import HoverContainer
 
 
-class HoverContainer(metaclass=bt.MetaParams):
-    """Class to store information about hover tooltips. Will be filled while Bokeh glyphs are created. After all figures are complete, hovers will be applied"""
-
-    params = (('hover_tooltip_config', None),
-              ('is_multidata', False)
-              )
-
-    def __init__(self):
-        self._hover_tooltips = []
-
-        self._config = []
-        input_config = [] if len(self.p.hover_tooltip_config) == 0 else self.p.hover_tooltip_config.split(',')
-        for c in input_config:
-            if len(c) != 2:
-                raise RuntimeError(f'Invalid hover config entry "{c}"')
-            self._config.append((self._get_type(c[0]), self._get_type(c[1])))
-
-    def add_hovertip(self, label: str, tmpl: str, src_obj=None) -> None:
-        self._hover_tooltips.append((label, tmpl, src_obj))
-
-    @staticmethod
-    def _get_type(t):
-        if t == 'd':
-            return bt.AbstractDataBase
-        elif t == 'i':
-            return bt.Indicator
-        elif t == 'o':
-            return bt.Observer
-        else:
-            raise RuntimeError(f'Invalid hovertool config type: "{t}')
-
-    def _apply_to_figure(self, fig, hovertool):
-        # provide ordering by two groups
-        tooltips_top = []
-        tooltips_bottom = []
-        for label, tmpl, src_obj in self._hover_tooltips:
-            apply: bool = src_obj is fig.master  # apply to own
-            foreign = False
-            if not apply and (isinstance(src_obj, bt.Observer) or isinstance(src_obj, bt.Indicator)) and src_obj.plotinfo.subplot is False:
-                # add objects that are on the same figure cause subplot is False (for Indicators and Observers)
-                # if plotmaster is set then it will decide where to add, otherwise clock is used
-                if src_obj.plotinfo.plotmaster is not None:
-                    apply = src_obj.plotinfo.plotmaster is fig.master
-                else:
-                    apply = src_obj._clock is fig.master
-            if not apply:
-                for c in self._config:
-                    if isinstance(src_obj, c[0]) and isinstance(fig.master, c[1]):
-                        apply = True
-                        foreign = True
-                        break
-
-            if apply:
-                prefix = ''
-                top = True
-                # prefix with data name if we got multiple datas
-                if self.p.is_multidata and foreign:
-                    if isinstance(src_obj, bt.Indicator):
-                        prefix = label_resolver.datatarget2label(src_obj.datas) + " - "
-                    elif isinstance(src_obj, bt.AbstractDataBase):
-                        prefix = label_resolver.datatarget2label([src_obj]) + " - "
-                    top = False
-
-                item = (prefix + label, tmpl)
-                if top:
-                    tooltips_top.append(item)
-                else:
-                    tooltips_bottom.append(item)
-
-        # first apply all top hover then all bottoms
-        for t in itertools.chain(tooltips_top, tooltips_bottom):
-            hovertool.tooltips.append(t)
-
-    def apply_hovertips(self, figures: List['FigureEnvelope']) -> None:
-        """Add hovers to to all figures from the figures list"""
-        for f in figures:
-            for t in f.figure.tools:
-                if not isinstance(t, HoverTool):
-                    continue
-
-                self._apply_to_figure(f, t)
-                break
-
-
-class FigureEnvelope(object):
+class Figure(object):
     """Class that wraps a *single* figure."""
     _tools = "pan,wheel_zoom,box_zoom,reset"
 
-    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder, is_multidata):
+    def __init__(self, strategy: bt.Strategy, cds: ColumnDataSource, hoverc: HoverContainer, start, end, scheme, master, plotorder):
         self._strategy = strategy
         self._cds: ColumnDataSource = cds
         self._scheme = scheme
         self._start = start
         self._end = end
-        self.figure: figure = None
+        self.bfigure: figure = None
         self._hover_line_set = False
         self._hover: Optional[HoverTool] = None
         self._hoverc = hoverc
@@ -124,65 +41,12 @@ class FigureEnvelope(object):
         self.plottab = None
         self.plotorder = plotorder
         self.datas = []  # list of all datas that have been plotted to this figure
-        self._is_multidata = is_multidata
         self._tradingdomain = None
         self._init_figure()
 
-    @staticmethod
-    def should_filter_by_tradingdomain(obj, tradingdomain):
-        """Check if an object should be filtered regarding the passing trading domain. Used to filter when plotting."""
-        if tradingdomain is None:
-            return True
-
-        if isinstance(tradingdomain, str):
-            tradingdomain = [tradingdomain]
-
-        obj_lg = get_tradingdomain(obj)
-        return obj_lg is True or obj_lg in tradingdomain
-
-    def get_tradingdomains(self) -> List[str]:
-        """Return the list of trading domain strings belonging to this FigureEnvelope. If no was manually configured then
-        the root data name is used."""
-        tradingdomains = []
-        if self._tradingdomain is None:
-            tradingdomains.append(get_tradingdomain(self.master))
-        elif isinstance(self._tradingdomain, list):
-            tradingdomains += self._tradingdomain
-        elif isinstance(self._tradingdomain, str):
-            tradingdomains.append(self._tradingdomain)
-        else:
-            raise Exception(f'Invalid type for tradingdomain: {type(self._tradingdomain)}')
-
-        return tradingdomains
-
-    def _set_single_hover_renderer(self, ren: Renderer):
-        """Sets this figure's hover to a single renderer"""
-        if self._hover_line_set:
-            return
-
-        self._hover.renderers = [ren]
-        self._hover_line_set = True
-
-    def _add_hover_renderer(self, ren: Renderer):
-        """Adds another hover render target. Only has effect if not single renderer has been set before"""
-        if self._hover_line_set:
-            return
-
-        if isinstance(self._hover.renderers, list):
-            self._hover.renderers.append(ren)
-        else:
-            self._hover.renderers = [ren]
-
-    def _nextcolor(self, key: object = None) -> int:
-        self._coloridx[key] += 1
-        return self._coloridx[key]
-
-    def _color(self, key: object = None):
-        return convert_color(self._scheme.color(self._coloridx[key]))
-
     def _init_figure(self):
         # plot height will be set later
-        f = figure(tools=FigureEnvelope._tools, x_axis_type='linear', aspect_ratio=self._scheme.plotaspectratio)
+        f = figure(tools=Figure._tools, x_axis_type='linear', aspect_ratio=self._scheme.plotaspectratio)
         # TODO: backend webgl (output_backend="webgl") removed due to this bug:
         # https://github.com/bokeh/bokeh/issues/7568
 
@@ -258,7 +122,59 @@ class FigureEnvelope(object):
         f.tools.append(h)
 
         self._hover = h
-        self.figure = f
+        self.bfigure = f
+
+    @staticmethod
+    def should_filter_by_tradingdomain(obj, tradingdomain):
+        """Check if an object should be filtered regarding the passing trading domain. Used to filter when plotting."""
+        if tradingdomain is None:
+            return True
+
+        if isinstance(tradingdomain, str):
+            tradingdomain = [tradingdomain]
+
+        obj_lg = get_tradingdomain(obj)
+        return obj_lg is True or obj_lg in tradingdomain
+
+    def get_tradingdomains(self) -> List[str]:
+        """Return the list of trading domain strings belonging to this FigureEnvelope. If no was manually configured then
+        the root data name is used."""
+        tradingdomains = []
+        if self._tradingdomain is None:
+            tradingdomains.append(get_tradingdomain(self.master))
+        elif isinstance(self._tradingdomain, list):
+            tradingdomains += self._tradingdomain
+        elif isinstance(self._tradingdomain, str):
+            tradingdomains.append(self._tradingdomain)
+        else:
+            raise Exception(f'Invalid type for tradingdomain: {type(self._tradingdomain)}')
+
+        return tradingdomains
+
+    def _set_single_hover_renderer(self, ren: Renderer):
+        """Sets this figure's hover to a single renderer"""
+        if self._hover_line_set:
+            return
+
+        self._hover.renderers = [ren]
+        self._hover_line_set = True
+
+    def _add_hover_renderer(self, ren: Renderer):
+        """Adds another hover render target. Only has effect if not single renderer has been set before"""
+        if self._hover_line_set:
+            return
+
+        if isinstance(self._hover.renderers, list):
+            self._hover.renderers.append(ren)
+        else:
+            self._hover.renderers = [ren]
+
+    def _nextcolor(self, key: object = None) -> int:
+        self._coloridx[key] += 1
+        return self._coloridx[key]
+
+    def _color(self, key: object = None):
+        return convert_color(self._scheme.color(self._coloridx[key]))
 
     def plot(self, obj):
         if isinstance(obj, bt.AbstractDataBase):
@@ -274,7 +190,7 @@ class FigureEnvelope(object):
         if len(self.datas) == 0:
             aspectr = getattr(obj.plotinfo, 'plotaspectratio', None)
             if aspectr is not None:
-                self.figure.aspect_ratio = aspectr
+                self.bfigure.aspect_ratio = aspectr
 
             tab = getattr(obj.plotinfo, 'plottab', None)
             if tab is not None:
@@ -348,21 +264,21 @@ class FigureEnvelope(object):
                 self._nextcolor(data.plotinfo.plotmaster)
                 color = convert_color(self._color(data.plotinfo.plotmaster))
 
-            renderer = self.figure.line('index', source_id + 'close', source=self._cds, line_color=color, legend_label=title)
+            renderer = self.bfigure.line('index', source_id + 'close', source=self._cds, line_color=color, legend_label=title)
             self._set_single_hover_renderer(renderer)
 
             self._hoverc.add_hovertip("Close", f"@{source_id}close", data)
         elif self._scheme.style == 'bar':
-            self.figure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
-            renderer = self.figure.vbar('index',
-                                        get_bar_width(),
-                                        source_id + 'open',
-                                        source_id + 'close',
-                                        source=self._cds,
-                                        fill_color=source_id + 'colors_bars',
-                                        line_color=source_id + 'colors_outline',
-                                        legend_label=title,
-                                        )
+            self.bfigure.segment('index', source_id + 'high', 'index', source_id + 'low', source=self._cds, color=source_id + 'colors_wicks', legend_label=title)
+            renderer = self.bfigure.vbar('index',
+                                         get_bar_width(),
+                                         source_id + 'open',
+                                         source_id + 'close',
+                                         source=self._cds,
+                                         fill_color=source_id + 'colors_bars',
+                                         line_color=source_id + 'colors_outline',
+                                         legend_label=title,
+                                         )
 
             self._set_single_hover_renderer(renderer)
 
@@ -374,7 +290,7 @@ class FigureEnvelope(object):
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
         # make sure the regular y-axis only scales to the normal data on 1st axis (not to e.g. volume data on 2nd axis)
-        self.figure.y_range.renderers.append(renderer)
+        self.bfigure.y_range.renderers.append(renderer)
 
         if self._scheme.volume and self._scheme.voloverlay:
             self.plot_volume(data, self._scheme.voltrans, True)
@@ -394,7 +310,7 @@ class FigureEnvelope(object):
         if extra_axis:
             source_data_axis = 'axvol'
 
-            self.figure.extra_y_ranges = {source_data_axis: DataRange1d(
+            self.bfigure.extra_y_ranges = {source_data_axis: DataRange1d(
                 range_padding=1.0/self._scheme.volscaling,
                 start=0,
             )}
@@ -405,16 +321,16 @@ class FigureEnvelope(object):
             ax = LinearAxis(y_range_name=source_data_axis, formatter=ax_formatter,
                             axis_label_text_color=ax_color, axis_line_color=ax_color, major_label_text_color=ax_color,
                             major_tick_line_color=ax_color, minor_tick_line_color=ax_color)
-            self.figure.add_layout(ax, 'left')
+            self.bfigure.add_layout(ax, 'left')
             kwargs['y_range_name'] = source_data_axis
         else:
-            self.figure.yaxis.formatter = ax_formatter
+            self.bfigure.yaxis.formatter = ax_formatter
 
-        vbars = self.figure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
+        vbars = self.bfigure.vbar('index', get_bar_width(), f'{source_id}volume', 0, source=self._cds, fill_color=f'{source_id}colors_volume', line_color="black", **kwargs)
 
         # make sure the new axis only auto-scales to the volume data
         if extra_axis:
-            self.figure.extra_y_ranges['axvol'].renderers = [vbars]
+            self.bfigure.extra_y_ranges['axvol'].renderers = [vbars]
 
         self._hoverc.add_hovertip("Volume", f"@{source_id}volume{{({self._scheme.number_format})}}", data)
 
@@ -465,7 +381,7 @@ class FigureEnvelope(object):
             if marker is not None:
                 fnc_name, attrs, vals, updates = get_marker_info(marker)
 
-                if not fnc_name or not hasattr(self.figure, fnc_name):
+                if not fnc_name or not hasattr(self.bfigure, fnc_name):
                     # provide alternative methods for not available methods
                     if fnc_name == "y":
                         fnc_name = "text"
@@ -499,7 +415,7 @@ class FigureEnvelope(object):
                             1, kwglyphs[u] + val)
                     else:
                         raise Exception(f"{u} for {marker} is not set but needs to be set")
-                glyph_fnc = getattr(self.figure, fnc_name)
+                glyph_fnc = getattr(self.bfigure, fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0
                 kwglyphs['line_color'] = 'black'
@@ -507,7 +423,7 @@ class FigureEnvelope(object):
                 kwglyphs['width'] = get_bar_width()
                 kwglyphs['top'] = source_id
 
-                glyph_fnc = self.figure.vbar
+                glyph_fnc = self.bfigure.vbar
             elif method == "line":
                 kwglyphs['line_width'] = 1
                 kwglyphs['color'] = color
@@ -520,7 +436,7 @@ class FigureEnvelope(object):
                 if linewidth is not None:
                     kwglyphs['line_width'] = linewidth
 
-                glyph_fnc = self.figure.line
+                glyph_fnc = self.bfigure.line
             else:
                 raise Exception(f"Unknown plotting method '{method}'")
 
@@ -534,10 +450,10 @@ class FigureEnvelope(object):
 
                 fcol = convert_color(fcol)
 
-                self.figure.varea('index', source=self._cds, y1=y1, y2=y2, fill_color=fcol, fill_alpha=falpha)
+                self.bfigure.varea('index', source=self._cds, y1=y1, y2=y2, fill_color=fcol, fill_alpha=falpha)
 
             # make sure the regular y-axis only scales to the normal data (data + ind/obs) on 1st axis (not to e.g. volume data on 2nd axis)
-            self.figure.y_range.renderers.append(renderer)
+            self.bfigure.y_range.renderers.append(renderer)
 
             # for markers add additional renderer so hover pops up for all of them
             if marker is None:
@@ -559,7 +475,7 @@ class FigureEnvelope(object):
             yticks = obj.plotinfo._get('plotyhlines', [])
 
         if yticks:
-            self.figure.yaxis.ticker = yticks
+            self.bfigure.yaxis.ticker = yticks
 
     def _plot_hlines(self, obj):
         hlines = obj.plotinfo._get('plothlines', [])
@@ -574,16 +490,15 @@ class FigureEnvelope(object):
                         line_color=hline_color,
                         line_dash=convert_linestyle(self._scheme.hlinesstyle),
                         line_width=self._scheme.hlineswidth)
-            self.figure.renderers.append(span)
+            self.bfigure.renderers.append(span)
 
     def _figure_append_title(self, title):
         # append to title
-        if len(self.figure.title.text) > 0:
-            self.figure.title.text += " | "
-        self.figure.title.text += title
+        if len(self.bfigure.title.text) > 0:
+            self.bfigure.title.text += " | "
+        self.bfigure.title.text += title
 
     def _add_to_cds(self, data, name):
         if name in self._cds.column_names:
             return
         self._cds.add(data, name)
-

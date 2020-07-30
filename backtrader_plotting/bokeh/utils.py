@@ -1,9 +1,7 @@
 from jinja2 import Environment, PackageLoader
-from typing import Union
 
 import matplotlib.colors
 
-import backtrader as bt
 from backtrader_plotting.utils import nanfilt
 
 from bokeh.models import ColumnDataSource
@@ -31,18 +29,17 @@ def get_bar_width() -> float:
     return 0.5
 
 
-_style_mpl2bokeh = {
-    '-': 'solid',
-    '--': 'dashed',
-    ':': 'dotted',
-    '.-': 'dotdash',
-    '-.': 'dashdot',
-}
-
-
 def convert_linestyle(style: str) -> str:
     """Converts a backtrader/matplotlib style string to bokeh style string"""
-    return _style_mpl2bokeh[style]
+    style_mpl2bokeh = {
+        '-': 'solid',
+        '--': 'dashed',
+        ':': 'dotted',
+        '.-': 'dotdash',
+        '-.': 'dashdot',
+    }
+
+    return style_mpl2bokeh[style]
 
 
 def adapt_yranges(y_range, data, padding_factor=200.0):

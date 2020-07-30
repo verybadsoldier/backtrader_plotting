@@ -83,7 +83,7 @@ class LiveClient:
 
         self._figurepage: FigurePage = self._bokeh.figurepages[self._figurepage_idx]
 
-        panels = self._bokeh.generate_model_tabs(self._figurepage)
+        panels = self._bokeh.generate_model_panels(self._figurepage)
 
         # now append analyzer tab(s)
         analyzers = self._figurepage.analyzers

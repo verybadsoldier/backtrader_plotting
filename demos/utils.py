@@ -34,19 +34,19 @@ class LiveDemoStrategy(bt.Strategy):
                 self.sell(self.datas[0], size=None)
 
 
-def run_cerebro(strategycls,
-                data_timeframes,
-                data_compressions,
-                resample_timeframes,
-                resample_compressions,
-                runtime_secondss=27,
-                starting_values=200,
-                tick_intervals=datetime.timedelta(seconds=11),
-                num_gen_barss=None,
-                start_delays=None,
-                num_data=1,
-                fnc_name='resampledata',
-                ):
+def run_cerebro_live(strategycls,
+                     data_timeframes,
+                     data_compressions,
+                     resample_timeframes,
+                     resample_compressions,
+                     runtime_secondss=27,
+                     starting_values=200,
+                     tick_intervals=datetime.timedelta(seconds=11),
+                     num_gen_barss=None,
+                     start_delays=None,
+                     num_data=1,
+                     fnc_name='resampledata',
+                     ):
     def _listify(val):
         return [val] * num_data if not isinstance(val, list) else val
 

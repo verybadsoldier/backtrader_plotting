@@ -96,7 +96,7 @@ def bokeh_plot(data):
     figs = cerebro.plot(b)
 
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
-    assert len(figs[0][0].figure_envs) == 6
+    assert len(figs[0][0].figures) == 6
 
 
 def test_github_issue10():

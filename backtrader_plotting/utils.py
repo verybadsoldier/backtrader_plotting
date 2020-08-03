@@ -153,7 +153,7 @@ def build_master_clock(strategy: bt.Strategy,
 
 
 def get_strategy_start_end(strategy, start, end):
-    """Get start and end indices for strategy."""
+    """Get start and end indices for strategy by given start and end datetimes."""
     st_dtime = strategy.lines.datetime.array
     if start is None:
         start = 0
@@ -172,7 +172,8 @@ def get_strategy_start_end(strategy, start, end):
     return start, end
 
 
-def find_by_plotid(strategy: bt.Strategy, plotid):
+def find_by_plotid(strategy: bt.Strategy, plotid: str):
+    """Finds the object with a give plotid in a strategy's datas, indicators and observers"""
     objs = itertools.chain(strategy.datas, strategy.getindicators(), strategy.getobservers())
     founds = []
     for obj in objs:

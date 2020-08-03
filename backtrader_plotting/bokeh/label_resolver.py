@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 import backtrader as bt
 
 from backtrader_plotting.utils import get_params_str
+import operator
 
 
 def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
@@ -17,7 +18,7 @@ def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
     labels = []
     for d in datas:
         if isinstance(d, bt.Indicator):
-            labels.append(indicator2label(d))
+            labels.append(obj2label(d))
         elif isinstance(d, bt.AbstractDataBase):
             for n in prim_names:
                 val = getattr(d, n, "")
@@ -35,51 +36,100 @@ def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
         return "Unidentified"
     return ','.join(labels)
 
-
+"""
 def strategy2label(strategycls: bt.MetaStrategy, params: Optional[bt.AutoInfoClass]) -> str:
     label = strategycls.__name__
     parameter_labels = get_params_str(params)
     if len(parameter_labels) > 0:
         label += f' [{parameter_labels}'
     return label
+    
+    
+def strategy2shortname(strategy: bt.Strategy) -> str:
+    return strategy.plotinfo.plotname or strategy.__class__.__name__
+"""
 
 
 def plotobj2label(obj):
-    if isinstance(obj, bt.Indicator):
-        return f'{indicator2label(obj)}@{indicator2fullid(obj)}'
+    if isinstance(obj, (bt.Indicator, bt.LinesOperation)):
+        return f'{obj2label(obj)}@{get_ind_depends_str(obj)}'
     elif isinstance(obj, bt.Observer):
-        return f'{observer2label(obj)}'
+        return f'{obj2label(obj)}'
     elif isinstance(obj, bt.AbstractDataBase):
         return obj.__class__.__name__
     else:
         raise RuntimeError(f'Unsupported type: {obj.__class__.__name__}')
 
 
-def indicator2label(ind: bt.Indicator):
-    return ind.plotlabel()
+def _operator2string(op) -> str:
+    opmap = {
+        operator.sub:'-',
+        operator.add: '+',
+        operator.mul: '*',
+        operator.truediv: '/',
+        operator.gt: '>',
+        operator.ge: '>=',
+        operator.lt: '<',
+        operator.le: '<=',
+        operator.eq: '=',
+        operator.mod: '%',
+        operator.ne: '!=',
+    }
+
+    return opmap[op] if op in opmap else '?'
 
 
-def observer2label(obs: bt.Observer):
-    return obs.plotlabel()
+def obj2label(ind: Union[bt.Indicator, bt.LinesOperation]):
+    if isinstance(ind, bt.LinesOperation):
+        # for LinesOperations we try to convert the operation to a string (like '+', '-' etc.)
+        for cur_ind in [x for x in ind._owner.getindicators() if isinstance(x, bt.LinesOperation)]:
+            op = _operator2string(cur_ind.operation)
+            if cur_ind is ind:
+                return f'LineOp{op}'
+        raise RuntimeError('Line not found')
+    else:
+        return ind.plotlabel()
 
 
-def strategy2shortname(strategy: bt.Strategy) -> str:
-    return strategy.plotinfo.plotname or strategy.__class__.__name__
+def get_line_alias(owner, line):
+    for idx, curline in enumerate(owner.lines):
+        if curline is not line:
+            continue
+        return owner._getlinealias(idx)
+    raise RuntimeError('Could not find line in owner lines')
 
 
-def indicator2fullid(ind: Union[bt.Indicator, bt.LineActions]) -> str:
+def line2str(line, owner):
+    if isinstance(line, bt.LinesOperation):
+        # (2)
+        return plotobj2label(line)
+    elif isinstance(line, bt.linebuffer._LineDelay):
+        # (2)
+        return plotobj2label(line)
+    else:
+        # (1) we try to find the line name by reading the owner
+        alias = get_line_alias(owner, line)  # we basically assume to only hae 1 line here
+        return alias + '@' + datatarget2label([owner])
+
+
+def get_ind_depends_str(ind: Union[bt.Indicator, bt.LineActions]) -> str:
     """Returns a string listing all involved data feeds. Empty string if there is only a single feed in the mix"""
-    if isinstance(ind, bt.LineActions):
-        return "Line Action"
-
     names = []
-    for x in ind.datas:
-        if isinstance(x, bt.AbstractDataBase):
-            return datatarget2label([x])
-        elif isinstance(x, bt.LineSeriesStub):
-            # indicator target is one specific line of a datafeed
-            # AFAIK it's not possible to know which line it is so we only add a generic indicator "[L]"
-            return datatarget2label([x._owner]) + '[L]'
-        elif isinstance(x, bt.Indicator):
-            names.append(indicator2label(x))
+    if isinstance(ind, bt.LinesOperation):
+        # datas are the lines involved in the LinesOperation
+        for line in ind._datas:
+            name = line2str(line, line._owner) + '@' + datatarget2label([line._owner])
+            names.append(name)
+    else:
+        for x in ind.datas:
+            if isinstance(x, bt.AbstractDataBase):
+                names.append(datatarget2label([x]))
+            elif isinstance(x, bt.LineSeriesStub):
+                # this happens in the following situations:
+                # 1. an indicator was created on a specific data line (e.g. SMA(data.high)
+                # 2. an indicator was created on an existing LineOperation
+                line0 = x.lines[0]
+                names.append(line2str(line0, x._owner))
+            elif isinstance(x, bt.Indicator):
+                names.append(obj2label(x))
     return f"({','.join(names)})"

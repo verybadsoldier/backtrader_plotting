@@ -1,6 +1,7 @@
 import backtrader as bt
 import datetime
 from backtrader_plotting.bokeh.label_resolver import plotobj2label
+import backtrader_plotting.bokeh.labelizer as labelizer
 
 from testcommon import getdatadir
 
@@ -31,7 +32,8 @@ def _run_test_cerebro(stratcls, expected_results):
 
     strategy = c.runstrats[0][0]
     for idx, ind in enumerate(strategy.getindicators()):
-        label = plotobj2label(ind)
+        # label = plotobj2label(ind)
+        label = labelizer.label(ind)
         assert(label == expected_results[idx])
 
 
@@ -60,7 +62,7 @@ def test_simple_2lines_spec():
         def __init__(self):
             bt.ind.CrossOver(self.data.high, self.data1)
 
-    _run_test_cerebro(StratSimple, ['CrossOver@(high@orcl-1995-2014,orcl-1995-2014)'])
+    _run_test_cerebro(StratSimple, ['CrossOver@(orcl-1995-2014^high,orcl-1995-2014)'])
 
 
 def test_specific_line():
@@ -69,7 +71,7 @@ def test_specific_line():
         def __init__(self):
             bt.indicators.SimpleMovingAverage(self.data.high, period=20, subplot=True)
 
-    _run_test_cerebro(StratSpecific, 'SimpleMovingAverage (20)@(high@orcl-1995-2014)')
+    _run_test_cerebro(StratSpecific, 'SimpleMovingAverage (20)@(orcl-1995-2014^high)')
 
 
 def test_simple_2lines():
@@ -90,7 +92,7 @@ def test_lineop():
 
     exp_results = [
         'DI (10)@(orcl-1995-2014)',
-        'LineOp-@(plusDI@DI (10)@(orcl-1995-2014),minusDI@DI (10)@(orcl-1995-2014))',
+        'LineOp-@(DI (10)^plusDI@(orcl-1995-2014),DI (10)^minusDI@(orcl-1995-2014))',
     ]
     _run_test_cerebro(StratLineOp, exp_results)
 
@@ -106,8 +108,8 @@ def test_ind_on_lineop():
 
     exp_results = [
         'DI (10)@(orcl-1995-2014)',
-        'LineOp-@(plusDI@DI (10)@(orcl-1995-2014),minusDI@DI (10)@(orcl-1995-2014))',
-        'CrossOver@(LineOp-@(plusDI@DI (10)@(orcl-1995-2014),minusDI@DI (10)@(orcl-1995-2014)),orcl-1995-2014)',
+        'LineOp-@(DI (10)^plusDI@(orcl-1995-2014),DI (10)^minusDI@(orcl-1995-2014))',
+        'CrossOver@(LineOp-@(DI (10)^plusDI@(orcl-1995-2014),DI (10)^minusDI@(orcl-1995-2014)),orcl-1995-2014)',
     ]
     _run_test_cerebro(StratIndOnLineOp, exp_results)
 
@@ -118,4 +120,13 @@ def test_lineop_data_lines():
         def __init__(self):
             self.data.high - self.data.close
 
-    _run_test_cerebro(StratLineOpData, 'LineOp-@(high@YahooFinanceCSVData,close@YahooFinanceCSVData)')
+    _run_test_cerebro(StratLineOpData, 'LineOp-@(orcl-1995-2014^high,orcl-1995-2014^close)')
+
+
+def test_delayed_data():
+    """A line operation on data lines"""
+    class StratLineOpData(bt.Strategy):
+        def __init__(self):
+            bt.indicators.SimpleMovingAverage(self.data.high(-7), period=20, subplot=True)
+
+    _run_test_cerebro(StratLineOpData, ['orcl-1995-2014^high(-7)', 'SimpleMovingAverage (20)@(orcl-1995-2014^high(-7))'])

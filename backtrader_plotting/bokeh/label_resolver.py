@@ -10,7 +10,7 @@ def datatarget2label(datas: List[Union[bt.AbstractDataBase, bt.Indicator]]):
     """Convert datas (usually a datafeed but might also be an indicator if one indicator operates on another indicator) to a readable string.
     If a name was provided manually then use that."""
 
-    # try some popular attributes that might carry string represantations
+    # try some popular attributes that might carry string representations
     # _name: user assigned value upon instantiation
     # shortname: used by some datafeeds
     # _dataname: underlying bt dataname (should always be available as last resort)

@@ -20,6 +20,7 @@ from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name,
 from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain, get_ind_areas, get_source_id
 from backtrader_plotting.bokeh.marker import get_marker_info
 from backtrader_plotting.bokeh.hover_container import HoverContainer
+from  backtrader_plotting.bokeh import labelizer
 
 
 class Figure(object):
@@ -341,7 +342,7 @@ class Figure(object):
         self._plot_indicator_observer(obj)
 
     def _plot_indicator_observer(self, obj: Union[bt.Indicator, bt.Observer]):
-        pl = plotobj2label(obj)
+        pl = labelizer.label(obj)
 
         self._figure_append_title(pl)
         indlabel = obj.plotlabel()

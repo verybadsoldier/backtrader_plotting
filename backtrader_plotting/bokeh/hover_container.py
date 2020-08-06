@@ -5,8 +5,6 @@ from bokeh.models import HoverTool
 
 import backtrader as bt
 
-from backtrader_plotting.bokeh import label_resolver
-
 
 class HoverContainer(metaclass=bt.MetaParams):
     """Class to store information about hover tooltips. Will be filled while Bokeh glyphs are created. After all figures are complete, hovers will be applied"""

@@ -1,6 +1,4 @@
 import collections
-import itertools
-import operator
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -14,8 +12,6 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool, CrosshairTool, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 from bokeh.models.formatters import NumeralTickFormatter
 
-from backtrader_plotting.bokeh import label_resolver
-from backtrader_plotting.bokeh.label_resolver import plotobj2label
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
 from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain, get_ind_areas, get_source_id
 from backtrader_plotting.bokeh.marker import get_marker_info
@@ -250,7 +246,7 @@ class Figure(object):
 
     def plot_data(self, data: bt.AbstractDataBase):
         source_id = get_source_id(data)
-        title = sanitize_source_name(label_resolver.datatarget2label([data]))
+        title = sanitize_source_name(labelizer.label(data))
 
         # append to title
         self._figure_append_title(title)

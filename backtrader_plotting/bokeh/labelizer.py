@@ -60,8 +60,9 @@ def line2str(line, owner):
     if isinstance(owner, bt.AbstractDataBase):
         # line of a data feed
         return _label_datafeed(owner) + '^' + _get_line_alias(line, owner)  # we basically assume to only hae 1 line here
-
-    if isinstance(line, bt.LinesOperation):
+    elif isinstance(owner, bt.IndicatorBase):
+        return label(line)
+    elif isinstance(line, bt.LinesOperation):
         return label(line)
     elif isinstance(line, bt.linebuffer._LineDelay):
         return label(line)
@@ -71,7 +72,7 @@ def line2str(line, owner):
 
 def label(obj, targets=True):
     primary = ''
-    if isinstance(obj, (bt.Indicator, bt.Observer)):
+    if isinstance(obj, (bt.IndicatorBase, bt.ObserverBase)):
         primary = obj.plotlabel()
     elif isinstance(obj, bt.LinesOperation):
         # convert the operation to a string (like '+', '-' etc.)

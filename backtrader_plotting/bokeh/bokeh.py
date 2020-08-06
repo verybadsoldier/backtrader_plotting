@@ -27,7 +27,6 @@ from jinja2 import Environment, PackageLoader
 
 from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
 from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indobs_dataobj, get_tradingdomain, get_plottype, PlotType, get_plotlineinfo, get_source_id, get_ind_areas, get_lines, build_master_clock, get_strategy_start_end
-from backtrader_plotting.bokeh import label_resolver
 from backtrader_plotting.bokeh.figure import Figure, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
 from backtrader_plotting.schemes import Blackly
@@ -105,7 +104,7 @@ class Bokeh(metaclass=bt.MetaParams):
             ctype, target = k.split(':')
 
             if ctype == 'r':  # regex
-                label = label_resolver.plotobj2label(obj)
+                label = labelizer.label(obj)
 
                 m = re.match(target, label)
                 if m:

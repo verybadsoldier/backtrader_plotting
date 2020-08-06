@@ -6,7 +6,7 @@ import markdown2
 import backtrader as bt
 
 from backtrader_plotting.utils import get_params, paramval2str
-from backtrader_plotting.bokeh.label_resolver import get_ind_depends_str
+from backtrader_plotting.bokeh import labelizer
 
 
 def _get_parameter_table(params) -> str:
@@ -61,8 +61,7 @@ def _get_strategy(strategy: bt.Strategy) -> str:
 
     md += '## Indicators:\n\n'
     for i in strategy.getindicators():
-        md += f'### {i.__class__.__name__} @ {get_ind_depends_str(i)}\n\n'
-        # md += f'Data: \n'
+        md += f'### {labelizer.label(i)}\n\n'
         md += _get_parameter_table(i.params)
 
     md += 'Source Code:\n'

@@ -1,6 +1,5 @@
 import backtrader as bt
 import datetime
-from backtrader_plotting.bokeh.label_resolver import plotobj2label
 import backtrader_plotting.bokeh.labelizer as labelizer
 
 from testcommon import getdatadir

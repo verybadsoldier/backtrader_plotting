@@ -27,14 +27,14 @@ def _run_cerebro(stratcls):
 
     cerebro.addanalyzer(bt.analyzers.SharpeRatio)
     cerebro.run()
-    b = backtrader_plotting.Bokeh(style='bar', scheme=Tradimo(), output_mode='show')
+    b = backtrader_plotting.Bokeh(style='bar', scheme=Tradimo(), output_mode='memory')
     return cerebro.plot(b)
 
 
 def test_plot_linedelay():
     class LineDelayStrat(bt.Strategy):
         def __init__(self):
-            bt.indicators.SimpleMovingAverage(self.data(-1), period=20, subplot=True)
+            bt.indicators.SimpleMovingAverage(self.data(-5), period=20, subplot=True)
 
         def next(self):
             pos = len(self.data)
@@ -47,7 +47,7 @@ def test_plot_linedelay():
     figs = _run_cerebro(LineDelayStrat)
 
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
-    assert len(figs[0][0].figures) == 4
+    assert len(figs[0][0].figures) == 5
     assert len(figs[0][0].analyzers) == 1
 
 

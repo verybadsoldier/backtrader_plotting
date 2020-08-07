@@ -71,20 +71,11 @@ def line2str(line, owner):
 
 
 def label(obj, targets=True):
-    primary = ''
     if isinstance(obj, (bt.IndicatorBase, bt.ObserverBase)):
         primary = obj.plotlabel()
     elif isinstance(obj, bt.LinesOperation):
-        # convert the operation to a string (like '+', '-' etc.)
-        assert(isinstance(obj._owner, bt.Strategy))
-        for cur_ind in [x for x in obj._owner.getindicators() if isinstance(x, bt.LinesOperation)]:
-            if cur_ind is not obj:
-                continue
-            op = _operator2string(cur_ind.operation)
-            primary = f'LineOp{op}'
-            break
-        else:
-            raise RuntimeError('Line not found')
+        op = _operator2string(obj.operation)
+        primary = f'LineOp{op}'
     elif isinstance(obj, bt.linebuffer._LineDelay):
         primary = _label_datafeed(obj.a._owner) + '^' + _get_line_alias(obj.a, obj.a._owner) + f'({obj.ago})'
     elif isinstance(obj, bt.LineSeriesStub):
@@ -94,19 +85,25 @@ def label(obj, targets=True):
     elif isinstance(obj, bt.LineBuffer):
         if isinstance(obj._owner, bt.AbstractDataBase):
             prefix = _label_datafeed(obj._owner)
+        elif isinstance(obj._owner, bt.MultiCoupler):
+            prefix = label(obj._owner.data)
         else:
             prefix = obj._owner.plotlabel()
         primary = prefix + '^' + _get_line_alias(obj, obj._owner)
+    elif isinstance(obj, bt.MultiCoupler):
+        primary = f'Coupler'
+    elif isinstance(obj, (int, float)):  # scalar
+        return str(obj)
     else:
         raise RuntimeError(f'Unsupported type: {obj.__class__.__name__}')
 
     # targets
     target_datas = []
     if targets:
-        if isinstance(obj, (bt.Indicator, bt.Observer)):
+        if isinstance(obj, (bt.Indicator, bt.Observer, bt.MultiCoupler)):
             target_datas = obj.datas
         elif isinstance(obj, bt.LinesOperation):
-            target_datas = obj._datas
+            target_datas = [obj.a, obj.b]
         elif isinstance(obj._owner, bt.Indicator):
             target_datas = obj._owner.datas
 
@@ -119,13 +116,3 @@ def label(obj, targets=True):
         total += '@(' + ','.join(targets) + ')'
 
     return total
-
-"""
-def _label_linesop(linesop: bt.LinesOperation):
-    # for LinesOperations we try to convert the operation to a string (like '+', '-' etc.)
-    for cur_ind in [x for x in linesop._owner.getindicators() if isinstance(x, bt.LinesOperation)]:
-        op = _operator2string(cur_ind.operation)
-        if cur_ind is ind:
-            return f'LineOp{op}'
-    raise RuntimeError('Line not found')
-"""

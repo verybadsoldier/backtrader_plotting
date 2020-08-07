@@ -178,6 +178,8 @@ class Figure(object):
             self.plot_data(obj)
         elif isinstance(obj, bt.indicator.Indicator):
             self.plot_indicator(obj)
+        elif isinstance(obj, bt.MultiCoupler):
+            pass  # is not plotted in backtrader
         elif isinstance(obj, bt.observers.Observer):
             self.plot_observer(obj)
         else:

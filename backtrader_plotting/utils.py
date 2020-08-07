@@ -119,7 +119,7 @@ def convert_to_pandas(master_clock, obj: bt.LineSeries, start: datetime.datetime
 
 def get_clock_line(obj: Union[bt.ObserverBase, bt.IndicatorBase, bt.StrategyBase]):
     """Find the corresponding clock for an object. A clock is a datetime line that holds timestamps for the line in question."""
-    if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase)):
+    if isinstance(obj, (bt.ObserverBase, bt.IndicatorBase, bt.MultiCoupler)):
         return get_clock_line(obj._clock)
     elif isinstance(obj, (bt.StrategyBase, bt.AbstractDataBase)):
         clk = obj

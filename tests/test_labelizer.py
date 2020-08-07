@@ -31,7 +31,6 @@ def _run_test_cerebro(stratcls, expected_results):
 
     strategy = c.runstrats[0][0]
     for idx, ind in enumerate(strategy.getindicators()):
-        # label = plotobj2label(ind)
         label = labelizer.label(ind)
         assert(label == expected_results[idx])
 
@@ -113,6 +112,19 @@ def test_ind_on_lineop():
     _run_test_cerebro(StratIndOnLineOp, exp_results)
 
 
+def test_data_lineop2():
+    """Two connected lineops on data"""
+    class StratIndOnLineOp(bt.Strategy):
+        def __init__(self):
+            self.data.high - self.data.close * 2
+
+    exp_results = [
+        'LineOp*@(orcl-1995-2014^close,2)',
+        'LineOp-@(orcl-1995-2014^high,LineOp*@(orcl-1995-2014^close,2))',
+    ]
+    _run_test_cerebro(StratIndOnLineOp, exp_results)
+
+
 def test_lineop_data_lines():
     """A line operation on data lines"""
     class StratLineOpData(bt.Strategy):
@@ -120,6 +132,22 @@ def test_lineop_data_lines():
             self.data.high - self.data.close
 
     _run_test_cerebro(StratLineOpData, 'LineOp-@(orcl-1995-2014^high,orcl-1995-2014^close)')
+
+
+def test_coupled_in_lines():
+    class StratLineOpData(bt.Strategy):
+        def __init__(self):
+            # data0 is a daily data
+            sma0 = bt.indicators.SMA(self.data0, period=15)  # 15 days sma
+            # data1 is a weekly data
+            sma1 = bt.indicators.SMA(self.data1, period=5)  # 5 weeks sma
+
+            self.buysig = sma0 > sma1()
+
+    _run_test_cerebro(StratLineOpData, ['SMA (15)@(orcl-1995-2014)',
+                                        'SMA (5)@(orcl-1995-2014)',
+                                        'Coupler@(SMA (5)@(orcl-1995-2014))',
+                                        'LineOp>@(SMA (15)^sma@(orcl-1995-2014),SMA (5)@(orcl-1995-2014)^sma)'])
 
 
 def test_delayed_data():

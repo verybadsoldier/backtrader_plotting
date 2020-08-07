@@ -55,7 +55,7 @@ def test_plot_double_operator():
     class LineDelayStrat(bt.Strategy):
         def __init__(self):
             d = self.data0.close - self.data0.high
-            d  + self.data1.high
+            d + self.data1.high
 
         def next(self):
             pos = len(self.data)
@@ -68,7 +68,24 @@ def test_plot_double_operator():
     figs = _run_cerebro(LineDelayStrat)
 
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
-    assert len(figs[0][0].figures) == 4
+    assert len(figs[0][0].figures) == 4  # the two LineOps won't be plotted according to original backtrader plotting
+    assert len(figs[0][0].analyzers) == 1
+
+
+def test_coupled_in_lines():
+    class StratLineOpData(bt.Strategy):
+        def __init__(self):
+            # data0 is a daily data
+            sma0 = bt.indicators.SMA(self.data0, period=15)  # 15 days sma
+            # data1 is a weekly data
+            sma1 = bt.indicators.SMA(self.data1, period=5)  # 5 weeks sma
+
+            self.buysig = sma0 > sma1()
+
+    figs = _run_cerebro(StratLineOpData)
+
+    assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
+    assert len(figs[0][0].figures) == 5
     assert len(figs[0][0].analyzers) == 1
 
 

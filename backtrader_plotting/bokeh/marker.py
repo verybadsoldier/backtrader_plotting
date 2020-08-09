@@ -101,14 +101,58 @@ _mrk_fncs = {
           {}, {}),
 }
 
+substitutes = {
+    'y': ('text', ["text_color", "text_size"], {"text": {"value": "y"}}),
+    'octagon': ('diamond_cross', ["color", "size"], {}),
+    'pentagon': ('diamond_dot', ["color", "size"], {}),
+}
+
 
 def get_marker_info(marker):
-    fnc_name, attrs, vals, updates = None, list(), dict(), dict()
     if isinstance(marker, (int, float)):
-        fnc_name, attrs, vals, updates = _mrk_fncs[int(marker)]
+        fnc_name, attrs, args, updates = _mrk_fncs[int(marker)]
     elif isinstance(marker, str):
-        fnc_name, attrs, vals, updates = _mrk_fncs[str(marker)[0]]
+        fnc_name, attrs, args, updates = _mrk_fncs[str(marker)[0]]
     else:
-        raise Exception(
-            f"unsupported marker type {type(marker)} for {marker}")
-    return fnc_name, attrs, vals, updates
+        raise Exception(f'Unsupported marker type "{type(marker)}" for "{marker}"')
+    return fnc_name, attrs, args, updates
+
+
+def build_marker_call(marker, bfigure, source_id, color, markersize):
+    """Returns the function name to plot makers and the corresponsing function arguments."""
+    fnc_name, attrs, args, updates = get_marker_info(marker)
+
+    kwglyphs = {}
+    if not fnc_name or not hasattr(bfigure, fnc_name):
+        # provide alternative methods for not available methods
+        if fnc_name in substitutes:
+            fnc_name, attrs, extra_args = substitutes[fnc_name]
+            args.update(extra_args)
+        else:
+            raise Exception(f'Sorry, marker function "{fnc_name}" not supported. Please report to GitHub.')
+    # set kwglyph values
+    kwglyphs['y'] = source_id
+    for v in attrs:
+        if v in ['color', 'fill_color', 'text_color']:
+            val = {"value": color}
+        elif v in ['size']:
+            val = markersize
+        elif v in ['text_font_size']:
+            val = {"value": f'{markersize}px'}
+        elif v in ['text']:
+            val = {"value": marker[1:-1]}
+        else:
+            raise Exception(f'Unexpected attribute: "{v}"')
+        kwglyphs[v] = val
+
+    # apply additional kw arguments
+    kwglyphs.update(args)
+
+    for u in updates:
+        val = updates[u]
+        if u in kwglyphs:
+            kwglyphs[u] = max(1, kwglyphs[u] + val)
+        else:
+            raise Exception(f"{u} for {marker} is not set but needs to be set")
+
+    return fnc_name, kwglyphs

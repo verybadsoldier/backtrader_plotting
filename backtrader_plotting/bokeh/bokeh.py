@@ -29,6 +29,7 @@ from backtrader_plotting.bokeh.utils import generate_stylesheet, append_cds
 from backtrader_plotting.utils import convert_to_master_clock, get_clock_line, find_by_plotid, convert_to_pandas, get_indobs_dataobj, get_tradingdomain, get_plottype, PlotType, get_plotlineinfo, get_source_id, get_ind_areas, get_lines, build_master_clock, get_strategy_start_end
 from backtrader_plotting.bokeh.figure import Figure, HoverContainer
 from backtrader_plotting.bokeh.datatable import TableGenerator
+from backtrader_plotting.bokeh import labelizer
 from backtrader_plotting.schemes import Blackly
 from backtrader_plotting.schemes.scheme import Scheme
 from backtrader_plotting.html import metadata

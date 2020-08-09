@@ -14,7 +14,7 @@ from bokeh.models.formatters import NumeralTickFormatter
 
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
 from backtrader_plotting.utils import get_plotlineinfo, get_tradingdomain, get_ind_areas, get_source_id
-from backtrader_plotting.bokeh.marker import get_marker_info
+from backtrader_plotting.bokeh.marker import build_marker_call
 from backtrader_plotting.bokeh.hover_container import HoverContainer
 from  backtrader_plotting.bokeh import labelizer
 
@@ -357,7 +357,6 @@ class Figure(object):
             if lineplotinfo._get('_plotskip', False):
                 continue
 
-            marker = lineplotinfo._get('marker', None)
             method = lineplotinfo._get('_method', 'line')
 
             color = getattr(lineplotinfo, 'color', None)
@@ -377,43 +376,9 @@ class Figure(object):
                 label += " " + (lineplotinfo._get("_name", "") or linealias)
             kwglyphs['legend_label'] = label
 
+            marker = lineplotinfo._get('marker', None)
             if marker is not None:
-                fnc_name, attrs, vals, updates = get_marker_info(marker)
-
-                if not fnc_name or not hasattr(self.bfigure, fnc_name):
-                    # provide alternative methods for not available methods
-                    if fnc_name == "y":
-                        fnc_name = "text"
-                        attrs = ["text_color", "text_size"]
-                        vals.update({"text": {"value": "y"}})
-                    else:
-                        raise Exception(
-                            "Sorry, unsupported marker:"
-                            + f" '{marker}'. Please report to GitHub.")
-                # set kwglyph values
-                kwglyphs['y'] = source_id
-                for v in attrs:
-                    val = None
-                    if v in ['color', 'fill_color', 'text_color']:
-                        val = {"value": color}
-                    elif v in ['size']:
-                        val = lineplotinfo.markersize
-                    elif v in ['text_font_size']:
-                        val = {"value": "%spx" % lineplotinfo.markersize}
-                    elif v in ['text']:
-                        val = {"value": marker[1:-1]}
-                    if val is not None:
-                        kwglyphs[v] = val
-                for v in vals:
-                    val = vals[v]
-                    kwglyphs[v] = val
-                for u in updates:
-                    val = updates[u]
-                    if u in kwglyphs:
-                        kwglyphs[u] = max(
-                            1, kwglyphs[u] + val)
-                    else:
-                        raise Exception(f"{u} for {marker} is not set but needs to be set")
+                fnc_name, kwglyphs = build_marker_call(marker, self.bfigure, source_id, color, lineplotinfo.markersize)
                 glyph_fnc = getattr(self.bfigure, fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0

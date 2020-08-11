@@ -220,7 +220,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # reset hover container to not mix hovers with other strategies
         hoverc = HoverContainer(hover_tooltip_config=self.p.scheme.hover_tooltip_config, is_multidata=len(strategy.datas) > 1)
 
-        strat_figureenvs: List[Figure] = []
+        figure_envs: List[Figure] = []
         for master, slaves in data_graph.items():
             plotorder = getattr(master.plotinfo, 'plotorder', 0)
             figureenv = Figure(strategy, self._cur_figurepage.cds, hoverc, start, end, self.p.scheme, master, plotorder)
@@ -229,9 +229,9 @@ class Bokeh(metaclass=bt.MetaParams):
 
             for s in slaves:
                 figureenv.plot(s)
-            strat_figureenvs.append(figureenv)
+            figure_envs.append(figureenv)
 
-        for f in strat_figureenvs:
+        for f in figure_envs:
             f.bfigure.legend.click_policy = self.p.scheme.legend_click
             f.bfigure.legend.location = self.p.scheme.legend_location
             f.bfigure.legend.background_fill_color = self.p.scheme.legend_background_color
@@ -239,12 +239,12 @@ class Bokeh(metaclass=bt.MetaParams):
             f.bfigure.legend.orientation = self.p.scheme.legend_orientation
 
         # link axis
-        for i in range(1, len(strat_figureenvs)):
-            strat_figureenvs[i].bfigure.x_range = strat_figureenvs[0].bfigure.x_range
+        for i in range(1, len(figure_envs)):
+            figure_envs[i].bfigure.x_range = figure_envs[0].bfigure.x_range
 
-        hoverc.apply_hovertips(strat_figureenvs)
+        hoverc.apply_hovertips(figure_envs)
 
-        self._cur_figurepage.figures += strat_figureenvs
+        self._cur_figurepage.figures += figure_envs
 
         # volume graphs
         for v in volume_graph:

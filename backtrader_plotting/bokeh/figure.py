@@ -378,7 +378,8 @@ class Figure(object):
 
             marker = lineplotinfo._get('marker', None)
             if marker is not None:
-                fnc_name, kwglyphs = build_marker_call(marker, self.bfigure, source_id, color, lineplotinfo.markersize)
+                fnc_name, extra_kwglyphs = build_marker_call(marker, self.bfigure, source_id, color, lineplotinfo.markersize)
+                kwglyphs.update(extra_kwglyphs)
                 glyph_fnc = getattr(self.bfigure, fnc_name)
             elif method == "bar":
                 kwglyphs['bottom'] = 0

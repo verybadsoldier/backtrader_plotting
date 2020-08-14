@@ -184,6 +184,9 @@ class PlotScheme(object):
         # strftime Format string for the display of data points values
         self.fmt_x_data = None
 
+        # include strategy source code in the meta data
+        self.strategysrc = False
+
     def color(self, idx):
         colidx = tab10_index[idx % len(tab10_index)]
         return self.lcolors[colidx]

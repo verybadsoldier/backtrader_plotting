@@ -368,7 +368,7 @@ class Bokeh(metaclass=bt.MetaParams):
         # append meta tab
         if not self._is_optreturn:
             assert figurepage.strategy is not None
-            meta = Div(text=metadata.get_metadata_div(figurepage.strategy))
+            meta = Div(text=metadata.get_metadata_div(figurepage.strategy, self.p.scheme.strategysrc))
             metapanel = Panel(child=meta, title="Meta")
             panels.append(metapanel)
 

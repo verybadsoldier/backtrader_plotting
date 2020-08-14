@@ -199,9 +199,6 @@ class PlotListener(bt.ListenerBase):
                 num_back = 1 if self._datastore.shape[0] > 0 else None  # if we have NO data yet then fetch all (first call)
                 new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
 
-                # i have seen an empty line in the past. let's catch it here
-                assert new_frame['datetime'].iloc[0] != np.datetime64('NaT')
-
                 # append data and remove old data
                 self._datastore = self._datastore.append(new_frame)
                 self._datastore = self._datastore.tail(self.p.lookback)

@@ -123,7 +123,7 @@ class Bokeh(metaclass=bt.MetaParams):
                 if not isinstance(obj, target_types[target_type]):
                     continue
 
-                if int(target_idx) != idx:
+                if target_idx != '*' and int(target_idx) != idx:
                     continue
                 apply_config(obj, config)
             elif ctype == 'id':  # plotid

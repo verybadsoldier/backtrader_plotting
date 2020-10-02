@@ -3,19 +3,18 @@ Library to add extended plotting capabilities to `backtrader` (https://www.backt
 
 ## Features
 * Interactive plots
-* Live trading support (needs custom `backtrader`)
+* Live trading support (needs custom `backtrader` - refer to the Wiki for further information)
 * Data replaying support
 * Interactive `backtrader` optimization result browser (only supported for single-strategy runs)
+* Customziable tab panels
 * Highly configurable
 * Different skinnable themes
 * Easy to use
 
-Feel free to test it and play with it. I am happy about feedback, critics and ideas on backtrader forum (and also in GitHub issues):
-https://community.backtrader.com/topic/813/bokeh-integration-interactive-webbrowser-plotting
-
 Needs Python >= 3.6.
 
 ## Demos
+Find runnable function demonstrations in folder `demos` or try the live demos here:
 https://verybadsoldier.github.io/backtrader_plotting/
 
 ## Installation

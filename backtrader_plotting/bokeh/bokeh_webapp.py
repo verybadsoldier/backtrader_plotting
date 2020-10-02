@@ -1,9 +1,11 @@
 import sys
+import webbrowser, threading
 
 from bokeh.application.handlers.function import FunctionHandler
 from bokeh.application import Application
 from bokeh.document import Document
 from bokeh.server.server import Server
+from bokeh.io import show
 
 from jinja2 import Environment, PackageLoader
 
@@ -50,7 +52,9 @@ class BokehWebapp:
         else:
             apps = {'/': app}
 
-            print(f"Open your browser here: http://localhost:{port}")
+            print(f"Browser is launching at: http://localhost:{port}")
+            threading.Timer(2, lambda: webbrowser.open(f'http://localhost:{port}')).start()
+            
             server = Server(apps, port=port, io_loop=ioloop)
             if ioloop is None:
                 server.run_until_shutdown()

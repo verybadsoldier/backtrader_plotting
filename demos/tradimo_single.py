@@ -9,8 +9,10 @@ from backtrader_plotting.schemes import Tradimo
 class MyStrategy(bt.Strategy):
     def __init__(self):
         sma1 = bt.indicators.SMA(period=11, subplot=True)
-        bt.indicators.SMA(period=17, plotmaster=sma1)
-        bt.indicators.RSI()
+        #bt.indicators.SMA(period=17, plotmaster=sma1)
+        #bt.indicators.RSI()
+        #bt.indicators.haDelta()
+        bt.indicators.Ichimoku()
 
     def next(self):
         pos = len(self.data)

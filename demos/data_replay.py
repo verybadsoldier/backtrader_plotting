@@ -8,11 +8,13 @@ import logging
 
 import backtrader as bt
 
+from backtrader_plotting.schemes import Blackly
 from utils import run_cerebro_live, LiveDemoStrategy
 
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s %(name)s:%(levelname)s:%(message)s', level=logging.DEBUG)
+
     cerebro, strat = run_cerebro_live(LiveDemoStrategy,
                                       data_timeframes=bt.TimeFrame.Ticks,
                                       data_compressions=1,
@@ -20,8 +22,8 @@ if __name__ == '__main__':
                                       resample_compressions=5,
                                       runtime_secondss=60000,
                                       tick_intervals=datetime.timedelta(seconds=1),
-                                      start_delays=0,
-                                      num_gen_barss=0,
+                                      start_delays=None,
+                                      num_gen_barss=None,
                                       num_data=1,
-                                      fnc_name='resampledata',
+                                      fnc_name='replaydata',
                                       )

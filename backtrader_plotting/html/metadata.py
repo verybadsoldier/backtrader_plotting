@@ -6,7 +6,7 @@ import markdown2
 import backtrader as bt
 
 from backtrader_plotting.utils import get_params, paramval2str
-from backtrader_plotting.bokeh.label_resolver import indicator2fullid
+from backtrader_plotting.bokeh import labelizer
 
 
 def _get_parameter_table(params) -> str:
@@ -54,19 +54,19 @@ def _get_datas(strategy: bt.Strategy) -> str:
     return md
 
 
-def _get_strategy(strategy: bt.Strategy) -> str:
+def _get_strategy(strategy: bt.Strategy, include_src=True) -> str:
     md = f'\n# Strategy: {strategy.__class__.__name__}\n'
 
     md += _get_parameter_table(strategy.params)
 
     md += '## Indicators:\n\n'
     for i in strategy.getindicators():
-        md += f'### {i.__class__.__name__} @ {indicator2fullid(i)}\n\n'
-        # md += f'Data: \n'
+        md += f'### {labelizer.label(i)}\n\n'
         md += _get_parameter_table(i.params)
 
-    md += 'Source Code:\n'
-    md += f'\n```\n{inspect.getsource(strategy.__class__)}\n```\n\n'
+    if include_src:
+        md += 'Source Code:\n'
+        md += f'\n```\n{inspect.getsource(strategy.__class__)}\n```\n\n'
 
     return md
 
@@ -94,10 +94,10 @@ def _get_observers(strategy: bt.Strategy) -> str:
     return md
 
 
-def get_metadata_div(strategy: bt.Strategy) -> str:
+def get_metadata_div(strategy: bt.Strategy, include_src=True) -> str:
     md = ""
 
-    md += _get_strategy(strategy)
+    md += _get_strategy(strategy, include_src)
     md += '* * *'
     md += _get_datas(strategy)
     md += '* * *'

@@ -1,8 +1,10 @@
 import asyncio
 from collections import defaultdict
+from enum import Enum
+from datetime import datetime
 import logging
 from threading import Lock
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import threading
 
 import numpy as np
@@ -25,6 +27,13 @@ import tornado.ioloop
 _logger = logging.getLogger(__name__)
 
 
+class _PatchPackage:
+    def __init__(self, column_name: str, dt: datetime, value):
+        self.column_name: str = column_name
+        self.value = value
+        self.datetime: datetime = dt  # if this is None then it will update the last data
+
+
 class PlotListener(bt.ListenerBase):
     params = (
         ('scheme', Blackly()),
@@ -34,6 +43,11 @@ class PlotListener(bt.ListenerBase):
         ('http_port', 80),
         ('title', 'Live'),
     )
+
+    class UpdateType(Enum):
+        APPEND = 1,
+        UPDATE_LAST = 2,
+        FILL_OR_PREPEND = 3,
 
     def __init__(self, **kwargs):
         self._cerebro: Optional[bt.Cerebro] = None
@@ -48,7 +62,12 @@ class PlotListener(bt.ListenerBase):
         self._clients: Dict[str, LiveClient] = {}
         self._bokeh_kwargs = kwargs
         self._bokeh = self._create_bokeh()
-        self._patch_pkgs = defaultdict(lambda: [])
+        self._pkgs_insert = defaultdict(lambda: [])
+        self._prev_strategy_len = 0
+        self._reset_patch_pkgs()
+
+    def _reset_patch_pkgs(self):
+        self._patch_pkgs: Dict[str, Dict[str, Any]] = defaultdict(lambda: {})
 
     def _create_bokeh(self):
         return Bokeh(style=self.p.style, scheme=self.p.scheme, **self._bokeh_kwargs)  # get a copy of the scheme so we can modify it per client
@@ -59,7 +78,6 @@ class PlotListener(bt.ListenerBase):
 
     def _bokeh_cb_build_root_model(self, doc: Document):
         client = LiveClient(doc,
-                            self._bokeh_cb_push_adds,
                             self._create_bokeh,
                             self._bokeh_cb_push_adds,
                             self._cerebro.runningstrats[self.p.strategyidx],
@@ -98,16 +116,24 @@ class PlotListener(bt.ListenerBase):
             document = bootstrap_document
 
         with self._lock:
-            client = self._clients[document.session_context.id]
-            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_data_index]
-
+            client: LiveClient = self._clients[document.session_context.id]
+            updatepkg_df: pandas.DataFrame = self._datastore[self._datastore['index'] > client.last_index]
             # skip if we don't have new data
             if updatepkg_df.shape[0] == 0:
                 return
 
             updatepkg = ColumnDataSource.from_df(updatepkg_df)
+            client.push_adds(updatepkg)
 
-            client.push_adds(updatepkg, new_last_index=updatepkg_df['index'].iloc[-1])
+    def _bokeh_full_refresh(self):
+        document = curdoc()
+        session_id = document.session_context.id
+        with self._lock:
+            client: LiveClient = self._clients[session_id]
+            client.push_full_refresh(self._datastore)
+
+            # remove any pending patch packages as we just have issued a full update
+            self._reset_patch_pkgs()
 
     def _bokeh_cb_push_patches(self):
         document = curdoc()
@@ -116,58 +142,62 @@ class PlotListener(bt.ListenerBase):
             client: LiveClient = self._clients[session_id]
 
             patch_pkgs = self._patch_pkgs[session_id]
-            self._patch_pkgs[session_id] = []
+            self._patch_pkgs[session_id] = {}  # reset
+            _logger.info("Patch pkg: " + str(patch_pkgs))
             client.push_patches(patch_pkgs)
 
-    def next(self):
-        strategy = self._cerebro.runningstrats[self.p.strategyidx]
+    def _queue_patch_pkg(self, current_frame):
+        last_index = self._datastore.index[-1]
+        for column_name in current_frame.columns:
+            d = current_frame[column_name].iloc[0]
+            if isinstance(d, float) and np.isnan(d):
+                continue
+            self._datastore.at[last_index, column_name] = d  # update data in datastore
+            for sess_id in self._clients.keys():
+                self._patch_pkgs[sess_id][column_name] = d
 
+                # WIP: make curernt bar outline red
+                # if column_name.endswith('outline'):
+                #    self._patch_pkgs[sess_id].append((column_name, None, '#ff0000'))
+
+    def _detect_update_type(self, strategy):
         # treat as update of old data if strategy datetime is duplicated and we have already data stored
-        is_update = len(strategy) > 1 and strategy.datetime[0] == strategy.datetime[-1] and self._datastore.shape[0] > 0
+        # in this case data in an older slot was added
+        if len(strategy) == self._prev_strategy_len:
+            return self.UpdateType.UPDATE_LAST
+        else:
+            assert len(strategy) > self._prev_strategy_len
+            if len(strategy) == 1 or self._datastore['datetime'].iloc[-1] != bt.num2date(strategy.datetime[0]):
+                return self.UpdateType.APPEND
+            elif self._datastore['datetime'].iloc[-1] == bt.num2date(strategy.datetime[0]):
+                # either data was added to the front or data in between was filled
+                return self.UpdateType.FILL_OR_PREPEND
+            else:
+                raise RuntimeError('Update type detection failed')
 
-        if is_update:
-            with self._lock:
-                fulldata = self._bokeh.build_strategy_data(strategy)
+    def next(self):
+        with self._lock:
+            strategy = self._cerebro.runningstrats[self.p.strategyidx]
+            update_type = self._detect_update_type(strategy)
+            self._prev_strategy_len = len(strategy)
 
-                # generate series with number of missing values per column
-                new_count = fulldata.isnull().sum()
-                cur_count = self._datastore.isnull().sum()
-
-                # boolean series that indicates which column is missing data
-                patched_cols = new_count != cur_count
-
-                # get dataframe with only those columns that added data
-                patchcols = fulldata[fulldata.columns[patched_cols]]
-                for column_name in patchcols.columns:
-                    for index, row in self._datastore.iterrows():
-                        # compare all values in this column
-                        od = row[column_name]
-                        odt = row['datetime']
-                        d = fulldata[column_name][index]
-                        dt = fulldata['datetime'][index]
-
-                        assert odt == dt
-
-                        # if value is different then put to patch package
-                        # either it WAS NaN and it's not anymore
-                        # or both not NaN but different now
-                        # and don't count it as True when both are NaN
-                        if not (pandas.isna(d) and pandas.isna(od)) and ((pandas.isna(od) and not pandas.isna(d)) or d != od):
-                            self._datastore.at[index, column_name] = d  # update data in datastore
-                            for sess_id in self._clients.keys():
-                                self._patch_pkgs[sess_id].append((column_name, odt, d))
-
+            _logger.info(f"next: update type: {update_type}")
+            if update_type == self.UpdateType.UPDATE_LAST:
+                startidx = int(self._datastore['index'].iloc[-1])
+                current_frame = self._bokeh.build_strategy_data(strategy, num_back=1, startidx=startidx)
+                self._queue_patch_pkg(current_frame)
                 for client in self._clients.values():
                     client.document.add_next_tick_callback(self._bokeh_cb_push_patches)
-        else:
-            with self._lock:
+            elif update_type == self.UpdateType.FILL_OR_PREPEND:
+                self._datastore = self._bokeh.build_strategy_data(strategy)
+                for client in self._clients.values():
+                    _logger.info('Adding full refersh callback')
+                    client.add_fullrefresh_callback(self._bokeh_full_refresh, 500)
+            elif update_type == self.UpdateType.APPEND:
                 nextidx = 0 if self._datastore.shape[0] == 0 else int(self._datastore['index'].iloc[-1]) + 1
 
-                num_back = 1 if self._datastore.shape[0] > 0 else None  # fetch all on first call
+                num_back = 1 if self._datastore.shape[0] > 0 else None  # if we have NO data yet then fetch all (first call)
                 new_frame = self._bokeh.build_strategy_data(strategy, num_back=num_back, startidx=nextidx)
-
-                # i have seen an empty line in the past. let's catch it here
-                assert new_frame['datetime'].iloc[0] != np.datetime64('NaT')
 
                 # append data and remove old data
                 self._datastore = self._datastore.append(new_frame)
@@ -181,3 +211,5 @@ class PlotListener(bt.ListenerBase):
                         # there was no callback to remove
                         pass
                     doc.add_next_tick_callback(self._bokeh_cb_push_adds)
+            else:
+                raise RuntimeError(f'Unexepected update_type: {update_type}')

@@ -1,28 +1,35 @@
 from collections import defaultdict
 from copy import copy
+from datetime import datetime, timedelta
 import logging
+from typing import Any, Callable, Dict, List
 
 import backtrader as bt
 
 from bokeh.models.widgets import Panel, Tabs, Slider, Button
-from bokeh.layouts import column, gridplot, row
+from bokeh.layouts import column, row
 from bokeh.io import curdoc
-from bokeh.models.widgets import CheckboxGroup, Div, Select
+from bokeh.models.widgets import Div, Select
 from bokeh.document import Document
+
+from bokeh.models import ColumnDataSource
 
 from backtrader_plotting.html import metadata
 from backtrader_plotting.bokeh.bokeh import FigurePage
+
+import pandas as pd
+
+import numpy as np
+
 
 _logger = logging.getLogger(__name__)
 
 
 class LiveClient:
-    def __init__(self, doc: Document, push_fnc, bokeh_fac: callable, push_data_fnc:callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
+    def __init__(self, doc: Document, bokeh_fac: callable, push_data_fnc: callable, strategy: bt.Strategy, figurepage_idx: int = 0, lookback: int = 20):
         self._slider_aspectratio = None
         self._push_data_fnc = push_data_fnc
-        self._push_fnc = push_fnc
         self._figurepage_idx = figurepage_idx
-        self.last_data_index = -1
         self._lookback = lookback
         self._strategy = strategy
         self._current_group = None
@@ -30,6 +37,7 @@ class LiveClient:
 
         self._bokeh_fac = bokeh_fac
         self._bokeh = None
+        self._callback_fullrefresh = None
 
         bokeh = self._bokeh_fac()  # temporary bokeh object to get tradingdomains and scheme
         self._scheme = copy(bokeh.p.scheme)  # preserve original scheme as originally provided by the user
@@ -52,6 +60,21 @@ class LiveClient:
 
         self._refreshmodel()
 
+    @property
+    def last_index(self):
+        if len(self._figurepage.cds.data['index']) == 0:
+            return -1
+        return int(self._figurepage.cds.data['index'][-1])
+
+    def add_fullrefresh_callback(self, cb: Callable, timeout: int):
+        if self._callback_fullrefresh is not None:
+            try:
+                self.document.remove_timeout_callback(self._callback_fullrefresh)
+            except ValueError:
+                # ignore error when timeout was already removed
+                pass
+        self._callback_fullrefresh = self.document.add_timeout_callback(cb, timeout)
+
     def _refreshmodel(self):
         self._bokeh = self._bokeh_fac()
         self._bokeh.p.scheme = self._scheme  # replace the original scheme with a possibly user customized scheme
@@ -60,7 +83,7 @@ class LiveClient:
 
         self._figurepage: FigurePage = self._bokeh.figurepages[self._figurepage_idx]
 
-        panels = self._bokeh.generate_model_tabs(self._figurepage)
+        panels = self._bokeh.generate_model_panels(self._figurepage)
 
         # now append analyzer tab(s)
         analyzers = self._figurepage.analyzers
@@ -73,8 +96,6 @@ class LiveClient:
         # append config panel
         panels.append(self._get_config_panel())
         self.model.children[1].tabs = panels
-
-        self.last_data_index = -1
 
     def _on_click_refresh_analyzers(self):
         panel = self._bokeh.get_analyzer_panel(self._figurepage.analyzers)
@@ -113,31 +134,39 @@ class LiveClient:
 
         _logger.info(f"Switching logic group finished")
 
-    def push_patches(self, patch_pkgs):
+    # region Functions to actually push data to the CDS
+    def push_full_refresh(self, fulldata: pd.DataFrame):
+        full_pkg = {c: fulldata[c].to_numpy() for c in self._figurepage.cds.column_names}
+        _logger.info(f"Sending full refresh package: {full_pkg}")
+        self._figurepage.cds.data.update(full_pkg)
+
+    def push_patches(self, patch_pkg: Dict[str, Any]):
         cds = self._figurepage.cds
 
-        dt_idx_map = {d: idx for idx, d in enumerate(cds.data['datetime'])}
+        idx = len(cds.data['index']) - 1
 
+        # we build the actual object that is pushed to the browser
         patch_dict = defaultdict(list)
-        for pp in patch_pkgs:
-            colname, dt, val = pp
-            if colname not in cds.data:
+        for c, v in patch_pkg.items():
+            if c == 'index':
                 continue
-            idx = dt_idx_map[dt.to_datetime64()]
-            patch_dict[colname].append((idx, val))
+
+            if c not in cds.data:
+                continue  # skip columns not existing in the current client data
+
+            patch_dict[c].append((idx, v))
         _logger.info(f"Sending patch dict: {patch_dict}")
 
         cds.patch(patch_dict)
 
-    def push_adds(self, updatepkg: dict, new_last_index: int):
-        self.last_data_index = new_last_index
-
+    def push_adds(self, updatepkg: dict):
         cds = self._figurepage.cds
-
         sendpkg = {}
         for c in updatepkg.keys():
-            if c in cds.data:
-                sendpkg[c] = updatepkg[c]
+            if c not in cds.data:
+                continue
+            sendpkg[c] = updatepkg[c]
 
         _logger.info(f'Sending stream package: {sendpkg}')
         cds.stream(sendpkg, self._lookback)
+    # endregion

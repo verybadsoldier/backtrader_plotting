@@ -49,7 +49,6 @@ class Scheme(_BtPlotScheme):
         self.table_color_odd = '#333333'
         self.table_header_color = '#7a7a7a'
 
-        self.analyzer_tab_width = 1860
         self.analyzer_tab_num_cols = 2
         self.plotaspectratio = 3.0
         self.plot_sizing_mode = "scale_width"

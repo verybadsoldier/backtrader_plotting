@@ -9,4 +9,4 @@ def assert_num_tabs(figs, *args):
 def assert_num_figures(figs, *args):
     for idx, num in enumerate(args):
         fp: FigurePage = figs[idx][0]
-        assert len(fp.figure_envs) == num
+        assert len(fp.figures) == num

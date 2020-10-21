@@ -20,7 +20,7 @@ class MyStrategy(bt.Strategy):
             self.sell(self.datas[0], size=None)
 
 
-if __name__ == '__main__':
+def test_github_issue44():
     cerebro = bt.Cerebro()
     data = bt.feeds.YahooFinanceCSVData(
         dataname=getdatadir("20170319-20200319-0388.HK.csv"),
@@ -43,3 +43,6 @@ if __name__ == '__main__':
     bo = Bokeh(style='bar', plot_mode='single', output_mode='memory')
     cerebro.plot(bo)
 
+
+if __name__ == '__main__':
+    test_github_issue44()

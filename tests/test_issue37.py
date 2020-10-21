@@ -41,4 +41,4 @@ def test_github_issue37_plotaspectratio():
     b = Bokeh(style='bar', plot_mode='single', scheme=Tradimo(), plotconfig=plotconfig, output_mode='memory')
     output = cerebro.plot(b)
 
-    assert output[0][0].figure_envs[1].figure.aspect_ratio == 10
+    assert output[0][0].figures[1].bfigure.aspect_ratio == 10

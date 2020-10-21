@@ -2,7 +2,6 @@ from jinja2 import Environment, PackageLoader
 
 import matplotlib.colors
 
-import backtrader as bt
 from backtrader_plotting.utils import nanfilt
 
 from bokeh.models import ColumnDataSource
@@ -30,18 +29,17 @@ def get_bar_width() -> float:
     return 0.5
 
 
-_style_mpl2bokeh = {
-    '-': 'solid',
-    '--': 'dashed',
-    ':': 'dotted',
-    '.-': 'dotdash',
-    '-.': 'dashdot',
-}
-
-
 def convert_linestyle(style: str) -> str:
     """Converts a backtrader/matplotlib style string to bokeh style string"""
-    return _style_mpl2bokeh[style]
+    style_mpl2bokeh = {
+        '-': 'solid',
+        '--': 'dashed',
+        ':': 'dotted',
+        '.-': 'dotdash',
+        '-.': 'dashdot',
+    }
+
+    return style_mpl2bokeh[style]
 
 
 def adapt_yranges(y_range, data, padding_factor=200.0):
@@ -96,13 +94,3 @@ def append_cds(base_cds: ColumnDataSource, new_cds: ColumnDataSource):
             continue
         updates.append((c, new_cds[c]))
     base_cds.data.update(updates)
-
-
-def get_indicator_data(indicator: bt.Indicator):
-    """The indicator might have been created using a specific line (like SMA(data.lines.close)). In this case
-    a LineSeriesStub has been created for which we have to resolve the original data"""
-    data = indicator.data
-    if isinstance(data, bt.LineSeriesStub):
-        return data._owner
-    else:
-        return data

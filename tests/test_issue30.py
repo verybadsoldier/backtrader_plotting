@@ -41,7 +41,7 @@ def test_github_issue30():
     figs = cerebro.plot(b)
 
     assert isinstance(figs[0][0], backtrader_plotting.bokeh.bokeh.FigurePage)
-    assert len(figs[0][0].figure_envs) == 4
+    assert len(figs[0][0].figures) == 4
     assert len(figs[0][0].analyzers) == 1
 
 

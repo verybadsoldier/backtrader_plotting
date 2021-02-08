@@ -21,9 +21,9 @@ class OptBrowser:
         self._sortasc = sortasc
         self._optresults = optresults
 
-    def start(self, ioloop=None):
+    def start(self, ioloop=None, iplot=True):
         webapp = BokehWebapp("Backtrader Optimization Result", "basic.html.j2", self._bokeh.params.scheme, self.build_optresult_model)
-        webapp.start(ioloop)
+        webapp.start(ioloop, iplot=iplot)
 
     def _build_optresult_selector(self, optresults) -> Tuple[DataTable, ColumnDataSource]:
         # 1. build a dict with all params and all user columns
@@ -32,7 +32,11 @@ class OptBrowser:
             for param_name, _ in optres[0].params._getitems():
                 param_val = optres[0].params._get(param_name)
                 data_dict[param_name].append(param_val)
-
+            if not optres[0].params._getitems():
+                for key, value in data_dict.items():
+                    v = value[0]
+                    val = type(v)() # create empty val of the same type
+                    data_dict[key].append(val)
             for usercol_label, usercol_fnc in self._usercolumns.items():
                 data_dict[usercol_label].append(usercol_fnc(optres))
 

@@ -65,8 +65,9 @@ def _get_strategy(strategy: bt.Strategy, include_src=True) -> str:
         md += _get_parameter_table(i.params)
 
     if include_src:
-        md += 'Source Code:\n'
-        md += f'\n```\n{inspect.getsource(strategy.__class__)}\n```\n\n'
+        pass
+        #md += 'Source Code:\n'
+        #md += f'\n```\n{inspect.getsource(strategy.__class__)}\n```\n\n'
 
     return md
 

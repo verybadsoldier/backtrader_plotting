@@ -21,7 +21,7 @@ class BokehWebapp:
         self._port = port
         self._on_session_destroyed = on_session_destroyed
 
-    def start(self, ioloop=None):
+    def start(self, ioloop=None, iplot=True):
         """Serves a backtrader result as a Bokeh application running on a web server"""
         def make_document(doc: Document):
             if self._on_session_destroyed is not None:
@@ -39,7 +39,7 @@ class BokehWebapp:
             model = self._model_factory_fnc(doc)
             doc.add_root(model)
 
-        self._run_server(make_document, ioloop=ioloop, port=self._port)
+        self._run_server(make_document, iplot=iplot, ioloop=ioloop, port=self._port)
 
     @staticmethod
     def _run_server(fnc_make_document, iplot=True, notebook_url="localhost:8889", port=80, ioloop=None):

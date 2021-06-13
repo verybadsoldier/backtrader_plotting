@@ -42,27 +42,6 @@ def convert_linestyle(style: str) -> str:
     return style_mpl2bokeh[style]
 
 
-def adapt_yranges(y_range, data, padding_factor=200.0):
-    nnan_data = nanfilt(data)
-    dmin = min(nnan_data, default=None)
-    dmax = max(nnan_data, default=None)
-
-    if dmin is None or dmax is None:
-        return
-
-    diff = ((dmax - dmin) or dmin) * padding_factor
-    dmin -= diff
-    dmax += diff
-
-    if y_range.start is not None:
-        dmin = min(dmin, y_range.start)
-    y_range.start = dmin
-
-    if y_range.end is not None:
-        dmax = max(dmax, y_range.end)
-    y_range.end = dmax
-
-
 def generate_stylesheet(scheme, template="basic.css.j2") -> str:
     env = Environment(loader=PackageLoader('backtrader_plotting.bokeh', 'templates'))
     templ = env.get_template(template)

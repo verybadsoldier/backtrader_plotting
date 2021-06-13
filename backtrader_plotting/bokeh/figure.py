@@ -43,9 +43,11 @@ class Figure(object):
 
     def _init_figure(self):
         # plot height will be set later
-        f = figure(tools=Figure._tools, x_axis_type='linear', aspect_ratio=self._scheme.plotaspectratio)
-        # TODO: backend webgl (output_backend="webgl") removed due to this bug:
-        # https://github.com/bokeh/bokeh/issues/7568
+        f = figure(tools=Figure._tools,
+                   x_axis_type='linear',
+                   aspect_ratio=self._scheme.plotaspectratio,
+                   output_backend="webgl",
+                   )
 
         f.y_range.range_padding = self._scheme.y_range_padding
 

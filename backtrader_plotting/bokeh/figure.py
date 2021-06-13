@@ -289,7 +289,7 @@ class Figure(object):
             raise Exception(f"Unsupported style '{self._scheme.style}'")
 
         # make sure the regular y-axis only scales to the normal data on 1st axis (not to e.g. volume data on 2nd axis)
-        self.bfigure.y_range.renderers.append(renderer)
+        self.bfigure.y_range.renderers = [renderer]
 
         if self._scheme.volume and self._scheme.voloverlay:
             self.plot_volume(data, self._scheme.voltrans, True)

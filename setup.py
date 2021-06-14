@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name='backtrader_plotting',
 
-    version='1.1.0',
+    version='2.0.0',
 
     description='Plotting package for Backtrader (Bokeh)',
 
@@ -29,7 +29,6 @@ setuptools.setup(
         "Demos": "https://github.com/verybadsoldier/backtrader_plotting/tree/gh-pages",
     },
 
-    # What does your project relate to?
     keywords=['trading', 'development', 'plotting', 'backtrader'],
 
     packages=setuptools.find_packages(),

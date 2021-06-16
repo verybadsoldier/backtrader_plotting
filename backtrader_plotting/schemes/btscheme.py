@@ -187,6 +187,9 @@ class PlotScheme(object):
         # include strategy source code in the meta data
         self.strategysrc = False
 
+        # bokeh output backend
+        self.output_backend = 'webgl'
+
     def color(self, idx):
         colidx = tab10_index[idx % len(tab10_index)]
         return self.lcolors[colidx]

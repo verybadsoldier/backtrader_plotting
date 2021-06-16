@@ -46,7 +46,7 @@ class Figure(object):
         f = figure(tools=Figure._tools,
                    x_axis_type='linear',
                    aspect_ratio=self._scheme.plotaspectratio,
-                   output_backend="webgl",
+                   output_backend=self._scheme.output_backend,
                    )
 
         f.y_range.range_padding = self._scheme.y_range_padding

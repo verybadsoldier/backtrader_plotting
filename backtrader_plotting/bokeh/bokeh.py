@@ -14,7 +14,7 @@ import numpy as np
 
 import pandas as pd
 
-from bokeh.models import ColumnDataSource, Model
+from bokeh.models import CrosshairTool, ColumnDataSource, Model
 from bokeh.models.widgets import Panel, Tabs
 from bokeh.layouts import column, gridplot
 
@@ -283,6 +283,12 @@ class Bokeh(metaclass=bt.MetaParams):
 
     def _on_post_generate_tab(self, tab_name: str, figureenvs: List[Figure]):
         """Configure figures after tabs have been assigned"""
+
+        # add crosshair to all plots which are linked to each other
+        ch = CrosshairTool(line_color=self.p.scheme.crosshair_line_color, dimensions='both')
+        for f in figureenvs:
+            f.bfigure.add_tools(ch)
+
         # configure xaxis visibility
         if self.p.scheme.xaxis_pos == "bottom":
             # only show xaxis for last figure

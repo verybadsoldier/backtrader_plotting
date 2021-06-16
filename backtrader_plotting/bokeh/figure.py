@@ -9,7 +9,7 @@ import pandas as pd
 
 from bokeh.models import Span
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, CrosshairTool, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
+from bokeh.models import HoverTool, LinearAxis, DataRange1d, Renderer, ColumnDataSource, FuncTickFormatter, DatetimeTickFormatter
 from bokeh.models.formatters import NumeralTickFormatter
 
 from backtrader_plotting.bokeh.utils import convert_color, sanitize_source_name, get_bar_width, convert_linestyle
@@ -110,9 +110,6 @@ class Figure(object):
                 return labels[index];
             """
             )
-
-        ch = CrosshairTool(line_color=self._scheme.crosshair_line_color)
-        f.tools.append(ch)
 
         h = HoverTool(tooltips=[('Time', f'@datetime{{{self._scheme.hovertool_timeformat}}}')],
                       mode="vline",

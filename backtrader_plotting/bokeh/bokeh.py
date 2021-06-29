@@ -201,7 +201,7 @@ class Bokeh(metaclass=bt.MetaParams):
 
         while True:
             pm = obj.plotinfo.plotmaster
-            if pm is None:
+            if pm is None or pm is obj:
                 break
             else:
                 obj = pm

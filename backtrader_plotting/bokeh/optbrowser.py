@@ -13,16 +13,17 @@ from backtrader_plotting.bokeh.bokeh_webapp import BokehWebapp
 
 
 class OptBrowser:
-    def __init__(self, bokeh: Bokeh, optresults, usercolumns: Dict[str, Callable] = None, num_result_limit=None, sortcolumn=None, sortasc=True):
+    def __init__(self, bokeh: Bokeh, optresults, usercolumns: Dict[str, Callable] = None, num_result_limit=None, sortcolumn=None, sortasc=True, port=80):
         self._usercolumns = {} if usercolumns is None else usercolumns
         self._num_result_limit = num_result_limit
         self._bokeh: Bokeh = bokeh
         self._sortcolumn = sortcolumn
         self._sortasc = sortasc
         self._optresults = optresults
+        self._port = port
 
     def start(self, ioloop=None):
-        webapp = BokehWebapp("Backtrader Optimization Result", "basic.html.j2", self._bokeh.params.scheme, self.build_optresult_model)
+        webapp = BokehWebapp("Backtrader Optimization Result", "basic.html.j2", self._bokeh.params.scheme, self.build_optresult_model, port=self._port)
         webapp.start(ioloop)
 
     def _build_optresult_selector(self, optresults) -> Tuple[DataTable, ColumnDataSource]:

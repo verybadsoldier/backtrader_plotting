@@ -37,6 +37,11 @@ def _label_datafeed(data):
     # _name: user assigned value upon instantiation
     # shortname: used by some datafeeds
     # _dataname: underlying bt dataname (should always be available as last resort)
+    if type(data) == bt.feed.DataClone:
+        r = data._filters[0][0]
+        if type(r) == bt.resamplerfilter.Resampler:
+            names = ['Ticks',' MicroSeconds',' Seconds',' Minutes','Days',' Weeks',' Months',' Years',' NoTimeFrame']
+            return '{}{}'.format(r.p.compression, names[r.p.timeframe-1])
     prim_names = ['_name', 'shortname', '_dataname']
     labels = []
     for n in prim_names:

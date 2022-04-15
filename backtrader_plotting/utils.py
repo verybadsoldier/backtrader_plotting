@@ -24,7 +24,7 @@ def paramval2str(name, value):
     elif isinstance(value, float):
         return f"{value:.2f}"
     elif isinstance(value, (list,tuple)):
-        return ','.join(value)
+        return ','.join(map(lambda x: paramval2str(name, x), value))
     elif isinstance(value, type):
         return value.__name__
     else:
